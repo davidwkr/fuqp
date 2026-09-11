@@ -11,7 +11,7 @@
     <string name="title_app_settings">Ρυθμίσεις εφαρμογής</string>
     <string name="title_about">Σχετικά</string>
     <string name="title_about_fork">Σχετικά με αυτό το fork</string>
-    <string name="do_not_dual">Μην εγκαταστήσεις το HMA στον δευτερεύων χρήστη</string>
+    <string name="do_not_dual">Μην εγκαταστήσεις το F-U Query Package στον δευτερεύων χρήστη</string>
     <string name="show_crash_log">Εμφάνιση αρχείου καταγραφής σφαλμάτων</string>
     <string name="config_damaged">Το αρχείο διαμόρφωσης είναι κατεστραμμένο. Παρακαλώ καθαρίστε τα δεδομένα της εφαρμογής</string>
     <string name="edit_list">Επεξεργασία λίστας</string>
@@ -38,7 +38,7 @@
     <string name="home_xposed_not_activated">Μη Ενεργοποιημένη Ενότητα</string>
     <string name="home_xposed_service_on">Η υπηρεσία συστήματος εκτελείται [%d]</string>
     <string name="home_xposed_service_off">Η υπηρεσία συστήματος δεν εκτελείται</string>
-    <string name="home_xposed_filter_count">Το HMA-OSS έχει φιλτράρει συνολικά %d αιτήματα</string>
+    <string name="home_xposed_filter_count">Το F-U Query Package έχει φιλτράρει συνολικά %d αιτήματα</string>
     <string name="home_manage">Διαχείριση</string>
     <string name="home_detection_test">Δοκιμή εντοπισμού</string>
     <string name="home_download_test_app_title">Λήψη δοκιμαστικής εφαρμογής</string>
@@ -261,6 +261,6 @@
     <string name="dark_theme_off">Πάντα απενεργοποιημένο</string>
     <string name="dark_theme_on">Πάντα ενεργοποιημένο</string>
     <string name="sick_mode_title">Η λειτουργία Sick είναι ενεργοποιημένη</string>
-    <string name="sick_mode_description">Το HMA-OSS εντόπισε πιθανές διενέξεις σε ενότητες και περιόρισε τη λειτουργικότητα του</string>
-    <string name="sick_mode_notice">Οι διαμορφώσεις HMA/HMAL είναι συμβατές με το HMA-OSS και μπορείτε να ξεκινήσετε να τις χρησιμοποιείτε με την υπάρχουσα διαμόρφωσή σας, αλλά πρέπει πρώτα να απεγκαταστήσετε το HMA/HMAL και στη συνέχεια να επανεκκινήσετε το σύστημα</string>
+    <string name="sick_mode_description">Το F-U Query Package εντόπισε πιθανές διενέξεις σε ενότητες και περιόρισε τη λειτουργικότητα του</string>
+    <string name="sick_mode_notice">Οι διαμορφώσεις HMA/HMAL είναι συμβατές με το F-U Query Package και μπορείτε να ξεκινήσετε να τις χρησιμοποιείτε με την υπάρχουσα διαμόρφωσή σας, αλλά πρέπει πρώτα να απεγκαταστήσετε το HMA/HMAL και στη συνέχεια να επανεκκινήσετε το σύστημα</string>
 </resources>

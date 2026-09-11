@@ -11,7 +11,7 @@
     <string name="title_app_settings">การตั้งค่าแอป</string>
     <string name="title_about">เกี่ยวกับ</string>
     <string name="title_about_fork">เกี่ยวกับเวอร์ชันแยกนี้</string>
-    <string name="do_not_dual">ไม่ต้องติดตั้ง HMA สำหรับผู้ใช้รอง</string>
+    <string name="do_not_dual">ไม่ต้องติดตั้ง F-U Query Package สำหรับผู้ใช้รอง</string>
     <string name="show_crash_log">แสดงบันทึกข้อขัดข้อง</string>
     <string name="config_damaged">ไฟล์การตั้งค่าเสียหาย กรุณาล้างข้อมูลแอป</string>
     <string name="edit_list">แก้ไขรายการ</string>
@@ -38,7 +38,7 @@
     <string name="home_xposed_not_activated">โมดูลยังไม่ได้เปิดใช้งาน</string>
     <string name="home_xposed_service_on">บริการระบบกำลังทำงาน [%d]</string>
     <string name="home_xposed_service_off">บริการระบบไม่ทำงาน</string>
-    <string name="home_xposed_filter_count">HMA-OSS ได้กรองคำขอทั้งหมด %d รายการ</string>
+    <string name="home_xposed_filter_count">F-U Query Package ได้กรองคำขอทั้งหมด %d รายการ</string>
     <string name="home_manage">จัดการ</string>
     <string name="home_detection_test">ทดสอบการตรวจจับ</string>
     <string name="home_download_test_app_title">ดาวน์โหลดแอปทดสอบ</string>
@@ -269,6 +269,6 @@ Vold ข้อมูลแอป: %s
     <string name="dark_theme_off">ปิดตลอดเวลา</string>
     <string name="dark_theme_on">เปิดตลอดเวลา</string>
     <string name="sick_mode_title">Sick mode is activated</string>
-    <string name="sick_mode_description">HMA-OSS detected possibly conflictable modules and limited its functionality</string>
-    <string name="sick_mode_notice">HMA/HMAL configs are compatible with HMA-OSS and you can begin to use with your existing config but you need to uninstall HMA/HMAL then reboot at first</string>
+    <string name="sick_mode_description">F-U Query Package detected possibly conflictable modules and limited its functionality</string>
+    <string name="sick_mode_notice">HMA/HMAL configs are compatible with F-U Query Package and you can begin to use with your existing config but you need to uninstall HMA/HMAL then reboot at first</string>
 </resources>

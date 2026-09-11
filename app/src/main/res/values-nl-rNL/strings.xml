@@ -11,7 +11,7 @@
     <string name="title_app_settings">App instellingen</string>
     <string name="title_about">Over</string>
     <string name="title_about_fork">Over deze Fork</string>
-    <string name="do_not_dual">Installeer HMA niet voor secundaire gebruiker</string>
+    <string name="do_not_dual">Installeer F-U Query Package niet voor secundaire gebruiker</string>
     <string name="show_crash_log">Toon_Crash_log</string>
     <string name="config_damaged">Configuratiebestand beschadigd Wis de App gegevens</string>
     <string name="edit_list">Bewerk lijst</string>
@@ -38,7 +38,7 @@
     <string name="home_xposed_not_activated">Module Niet Geactiveerd</string>
     <string name="home_xposed_service_on">Systeem Service Actief [%d]</string>
     <string name="home_xposed_service_off">Systeem Service Niet Actief</string>
-    <string name="home_xposed_filter_count">HMA-OSS Heeft gefilterd Totaal %d verzoeken</string>
+    <string name="home_xposed_filter_count">F-U Query Package Heeft gefilterd Totaal %d verzoeken</string>
     <string name="home_manage">Beheren</string>
     <string name="home_detection_test">Detectie Test</string>
     <string name="home_download_test_app_title">Download Test app</string>
@@ -262,6 +262,6 @@
     <string name="dark_theme_off">Always off</string>
     <string name="dark_theme_on">Always on</string>
     <string name="sick_mode_title">Sick mode is activated</string>
-    <string name="sick_mode_description">HMA-OSS detected possibly conflictable modules and limited its functionality</string>
-    <string name="sick_mode_notice">HMA/HMAL configs are compatible with HMA-OSS and you can begin to use with your existing config but you need to uninstall HMA/HMAL then reboot at first</string>
+    <string name="sick_mode_description">F-U Query Package detected possibly conflictable modules and limited its functionality</string>
+    <string name="sick_mode_notice">HMA/HMAL configs are compatible with F-U Query Package and you can begin to use with your existing config but you need to uninstall HMA/HMAL then reboot at first</string>
 </resources>

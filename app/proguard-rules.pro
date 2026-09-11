@@ -5,6 +5,6 @@
 }
 
 -keep,allowoptimization class * extends androidx.preference.PreferenceFragmentCompat
--keepclassmembers class org.frknkrc44.hma_oss.databinding.**  {
+-keepclassmembers class com.iodvd.fuqp.databinding.**  {
     public <methods>;
 }

@@ -10,8 +10,8 @@
     <string name="title_app_select">选择应用</string>
     <string name="title_app_settings">应用设置</string>
     <string name="title_about">关于</string>
-    <string name="title_about_fork">关于HMA-OSS</string>
-    <string name="do_not_dual">请勿将HMA-OSS安装到分身或多用户空间</string>
+    <string name="title_about_fork">关于F-U Query Package</string>
+    <string name="do_not_dual">请勿将F-U Query Package安装到分身或多用户空间</string>
     <string name="show_crash_log">显示崩溃日志</string>
     <string name="config_damaged">配置文件已损坏，需要清除应用数据</string>
     <string name="edit_list">编辑列表</string>
@@ -38,7 +38,7 @@
     <string name="home_xposed_not_activated">模块未激活</string>
     <string name="home_xposed_service_on">系统服务运行中 [%d]</string>
     <string name="home_xposed_service_off">系统服务未运行</string>
-    <string name="home_xposed_filter_count">HMA-OSS 进行了 %d 次拦截</string>
+    <string name="home_xposed_filter_count">F-U Query Package 进行了 %d 次拦截</string>
     <string name="home_manage">管理</string>
     <string name="home_detection_test">拦截测试</string>
     <string name="home_download_test_app_title">下载应用列表检测器</string>
@@ -57,7 +57,7 @@
     <string name="home_update">更新： %s</string>
     <string name="home_migrate_data_fix_button">一键修复</string>
     <string name="home_migrate_data">一键修复</string>
-    <string name="home_migrate_data_summary">此操作将卸载其它HMA分支，在这之前，是否将其数据迁移到HMA-OSS？</string>
+    <string name="home_migrate_data_summary">此操作将卸载其它HMA分支，在这之前，是否将其数据迁移到F-U Query Package？</string>
     <string name="home_migrate_data_failed">迁移数据失败：检测到多个其他HMA分支</string>
     <string name="home_migrate_data_completed">修复完成！需要重启设备。</string>
     <string name="home_migrate_uninstall_only">仅卸载</string>
@@ -178,9 +178,9 @@
     <string name="settings_hide_icon">隐藏桌面图标</string>
     <string name="settings_hide_icon_summary">您仍可以在 Root 管理器中打开此应用</string>
     <string name="settings_bypass_risky_package_warning">禁用\"风险应用警告\"</string>
-    <string name="settings_bypass_risky_package_warning_summary">配置风险应用时不弹出警告弹窗（HMA-OSS 不为无视警告导致的问题负责）</string>
+    <string name="settings_bypass_risky_package_warning_summary">配置风险应用时不弹出警告弹窗（F-U Query Package 不为无视警告导致的问题负责）</string>
     <string name="settings_disable_activity_launch_protection">不要拦截可疑的Activity启动</string>
-    <string name="settings_disable_activity_launch_protection_summary">某些检测器会通过打开Root应用来检测其是否安装，HMA-OSS 默认会帮您拦截，开启此选项后，HMA-OSS 将不再拦截（推荐保持关闭）</string>
+    <string name="settings_disable_activity_launch_protection_summary">某些检测器会通过打开Root应用来检测其是否安装，F-U Query Package 默认会帮您拦截，开启此选项后，F-U Query Package 将不再拦截（推荐保持关闭）</string>
     <string name="settings_system_wallpaper">使用系统壁纸</string>
     <string name="settings_clear_uninstalled_app_configs">清除残留配置</string>
     <string name="settings_clear_uninstalled_app_configs_summary">清除已卸载应用的配置，重新安装应用后需要重新进行配置</string>
@@ -192,7 +192,7 @@
     <string name="settings_disable_hooks">禁用注入点</string>
     <string name="settings_disable_hooks_summary">您可以禁用部分注入点以避免与其它模块冲突</string>
     <string name="settings_enable_internet">允许网络连接</string>
-    <string name="settings_enable_internet_summary">禁用此选项后，HMA-OSS 无法在线检查更新或使用其他联网功能</string>
+    <string name="settings_enable_internet_summary">禁用此选项后，F-U Query Package 无法在线检查更新或使用其他联网功能</string>
     <string name="settings_default_config">默认隐藏配置</string>
     <string name="settings_default_config_summary">为新安装的应用自动套用的配置项，已有配置的应用不受影响（不会影响当前已安装的应用）</string>
     <string name="settings_webview_protection">WebView 补丁</string>
@@ -224,9 +224,9 @@
     <string name="about_description">尽管检测用户是否安装了特定应用来判断系统环境是不正确的，但并非所有 Root 应用都支持随机包名。一旦应用程序检测到安装了 Root 相关应用（如 Fake Location 或 存储空间隔离）与检测到了 Root 本身无异。\n\n况且，某些“聪明”的应用还会利用各种漏洞获取您的应用列表，以此为您量身定制\"个性化广告\"。\n\n本模块作为一个 Zygisk 模块，可以隐藏特定应用，或拒绝应用列表请求，从而保护您的隐私。</string>
     <string name="about_fork_description">原版\"隐藏应用列表\"已闭源，且其最后的开源代码未适配新版 Android。因此，我创建了此项目来继续保持开源维护</string>
     <string name="about_how_to_use_title">模块帮助文档</string>
-    <string name="about_how_to_use_description_1">如何对一个应用配置隐藏？\n1. 在\"应用管理\" 中选择目标应用（要对其隐藏应用的应用）\n2. 打开“启用隐藏”\n以下是各项隐藏设置的介绍\n\n模板设置：选择要用于此应用的模板\n1. 工作模式：继承原版”隐藏应用列表“功能，用于控制此应用使用白名单模板还是黑名单模板\n2. 应用模板：继承原版”隐藏应用列表“功能，用于选择用于此应用的黑/白名单模板\n3. 应用预设（HMA-OSS特色功能）：内置的黑名单模板\n4. 设置模板（HMA-OSS特色功能）：用于选择用于此应用的设置模板\n5. 设置预设（HMA-OSS特色功能）：内置的设置模板\n6. 额外可见/不可见应用（HMA-OSS特色功能）：字面意思，在当前黑/白名单模板与预设的基础上额外添加可见/不可见的应用的例外\n\n伪装安装来源：为目标应用伪装其他应用的安装来源，伪装设备上没有安装过第三方应用\n\n关于设置模板（HMA-OSS特色功能）\n1. 对目标应用欺骗\"设置项\"(SettingsProvider) 的属性值，\"设置项\"存储了大部分安卓运行数据（例如adb调试开启状态，无障碍应用列表等等）\n2. 检测器/银行软件会读取设置项来判断环境是否可疑\n3. 使用”设置模板“可以帮助你为应用伪装这些”设置项“的数值\n注意：配置设置模板需要您自行了解 SettingsProvider 的数据结构\n\n关于模板\n黑名单模板：可疑应用程序集合，在模板中的应用无法被看到\n白名单模板：干净应用程序集合，不在模板中的应用无法被看到\n设置模板（HMA-OSS特色功能）：要覆盖写入的设置项集合\n\n关于预设（HMA-OSS特色功能）：内置的模板，用于让用户不需要手动创建模板，更方便使用\n提示：你可以通过\"查看预设\"查看预设（内置模板）里有哪些应用程序\n\n关于批量配置向导（HMA-OSS特色功能）：让你快速把同一个配置用于多个应用的工具\n1. 编辑\"应用设置”，像配置普通应用一样配置隐藏设置，配置完后返回到上一页\n2. 点击“编辑列表”，选择需要使用此“隐藏设置”的应用程序，选择完后返回上一页\n3. 点击\"应用\"，把配置复制到选中的应用程序\n\n关于默认隐藏配置（HMA-OSS特色功能）：在新应用程序安装后，为新应用程序自动套用的应用配置\n注意：此功能位于\"设置->默认隐藏配置\"\n1. 配置普通应用一样配置隐藏设置，配置完后返回到上一页就配置完成了\n2. 如果安装的应用之前有被手动/自动配置过，则不会覆盖其配置项\n3. 此功能不会影响当前已经安装的应用程序\n\n注意：您可以到\"模板管理\"中手动添加模板，模版可以把相同的配置保存起来，同时应用给多个目标应用</string>
+    <string name="about_how_to_use_description_1">如何对一个应用配置隐藏？\n1. 在\"应用管理\" 中选择目标应用（要对其隐藏应用的应用）\n2. 打开“启用隐藏”\n以下是各项隐藏设置的介绍\n\n模板设置：选择要用于此应用的模板\n1. 工作模式：继承原版”隐藏应用列表“功能，用于控制此应用使用白名单模板还是黑名单模板\n2. 应用模板：继承原版”隐藏应用列表“功能，用于选择用于此应用的黑/白名单模板\n3. 应用预设（F-U Query Package特色功能）：内置的黑名单模板\n4. 设置模板（F-U Query Package特色功能）：用于选择用于此应用的设置模板\n5. 设置预设（F-U Query Package特色功能）：内置的设置模板\n6. 额外可见/不可见应用（F-U Query Package特色功能）：字面意思，在当前黑/白名单模板与预设的基础上额外添加可见/不可见的应用的例外\n\n伪装安装来源：为目标应用伪装其他应用的安装来源，伪装设备上没有安装过第三方应用\n\n关于设置模板（F-U Query Package特色功能）\n1. 对目标应用欺骗\"设置项\"(SettingsProvider) 的属性值，\"设置项\"存储了大部分安卓运行数据（例如adb调试开启状态，无障碍应用列表等等）\n2. 检测器/银行软件会读取设置项来判断环境是否可疑\n3. 使用”设置模板“可以帮助你为应用伪装这些”设置项“的数值\n注意：配置设置模板需要您自行了解 SettingsProvider 的数据结构\n\n关于模板\n黑名单模板：可疑应用程序集合，在模板中的应用无法被看到\n白名单模板：干净应用程序集合，不在模板中的应用无法被看到\n设置模板（F-U Query Package特色功能）：要覆盖写入的设置项集合\n\n关于预设（F-U Query Package特色功能）：内置的模板，用于让用户不需要手动创建模板，更方便使用\n提示：你可以通过\"查看预设\"查看预设（内置模板）里有哪些应用程序\n\n关于批量配置向导（F-U Query Package特色功能）：让你快速把同一个配置用于多个应用的工具\n1. 编辑\"应用设置”，像配置普通应用一样配置隐藏设置，配置完后返回到上一页\n2. 点击“编辑列表”，选择需要使用此“隐藏设置”的应用程序，选择完后返回上一页\n3. 点击\"应用\"，把配置复制到选中的应用程序\n\n关于默认隐藏配置（F-U Query Package特色功能）：在新应用程序安装后，为新应用程序自动套用的应用配置\n注意：此功能位于\"设置->默认隐藏配置\"\n1. 配置普通应用一样配置隐藏设置，配置完后返回到上一页就配置完成了\n2. 如果安装的应用之前有被手动/自动配置过，则不会覆盖其配置项\n3. 此功能不会影响当前已经安装的应用程序\n\n注意：您可以到\"模板管理\"中手动添加模板，模版可以把相同的配置保存起来，同时应用给多个目标应用</string>
     <string name="about_how_to_use_description_2">修改配置后立刻生效</string>
-    <string name="about_how_to_use_description_3">此应用程序为HMA-OSS管理器应用，不提供实际功能。您需要安装Zygisk框架（如 ZygiskNext）与HMA-OSS后端模块，此应用程序才能正常运行。</string>
+    <string name="about_how_to_use_description_3">此应用程序为F-U Query Package管理器应用，不提供实际功能。您需要安装Zygisk框架（如 ZygiskNext）与F-U Query Package后端模块，此应用程序才能正常运行。</string>
     <string name="about_translator">翻译者</string>
     <string name="about_developer">开发者</string>
     <string name="about_support">支持与反馈</string>
@@ -256,6 +256,6 @@
     <string name="dark_theme_off">始终关闭</string>
     <string name="dark_theme_on">始终开启</string>
     <string name="sick_mode_title">安全模式</string>
-    <string name="sick_mode_description">HMA-OSS 检测到同类模块（原版隐藏应用列表或其分支），为避免冲突已禁用自身核心功能</string>
+    <string name="sick_mode_description">F-U Query Package 检测到同类模块（原版隐藏应用列表或其分支），为避免冲突已禁用自身核心功能</string>
     <string name="sick_mode_notice"></string>
 </resources>

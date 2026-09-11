@@ -10,8 +10,8 @@
     <string name="title_app_select">選擇應用程式</string>
     <string name="title_app_settings">應用程式設定</string>
     <string name="title_about">關於</string>
-    <string name="title_about_fork">關於HMA-OSS</string>
-    <string name="do_not_dual">請勿將HMA-OSS安裝到分身或多使用者空間</string>
+    <string name="title_about_fork">關於F-U Query Package</string>
+    <string name="do_not_dual">請勿將F-U Query Package安裝到分身或多使用者空間</string>
     <string name="show_crash_log">顯示崩潰日誌</string>
     <string name="config_damaged">配置檔損毀，請清理應用程式的資料</string>
     <string name="edit_list">編輯列表</string>
@@ -261,6 +261,6 @@
     <string name="dark_theme_off">總是關閉</string>
     <string name="dark_theme_on">總是開啟</string>
     <string name="sick_mode_title">安全模式</string>
-    <string name="sick_mode_description">HMA-OSS 檢測到同類的模塊，爲避免衝突已禁用自身核心功能</string>
-    <string name="sick_mode_notice">提示: HMA/HMAL配置與HMA-OSS相容，在HMA/HMAL中備份的配置檔案可在HMA-OSS中恢復使用。解除安裝HMA/HMAL並重啟手機後，HMA-OSS即可恢復執行</string>
+    <string name="sick_mode_description">F-U Query Package 檢測到同類的模塊，爲避免衝突已禁用自身核心功能</string>
+    <string name="sick_mode_notice">提示: HMA/HMAL配置與F-U Query Package相容，在HMA/HMAL中備份的配置檔案可在F-U Query Package中恢復使用。解除安裝HMA/HMAL並重啟手機後，F-U Query Package即可恢復執行</string>
 </resources>

@@ -1,0 +1,65 @@
+package com.iodvd.fuqp.zygote.hook
+
+import android.os.Build
+import com.iodvd.fuqp.common.CollectionUtils.lastOrNullWithType
+import com.iodvd.fuqp.common.Constants
+import com.iodvd.fuqp.zygote.service.BulkHooker
+import com.iodvd.fuqp.zygote.service.FUQPService.Companion.service
+import com.iodvd.fuqp.zygote.util.Logcat.logD
+import com.iodvd.fuqp.zygote.util.Logcat.logI
+import com.iodvd.fuqp.zygote.util.ServiceUtils.sAppDataIsolationEnabled
+import com.iodvd.fuqp.zygote.util.ZLUtils.args
+import com.iodvd.fuqp.zygote.util.ZLUtils.setArgument
+import com.iodvd.fuqp.zygote.util.ZygoteConstants.ZYGOTE_PROCESS_CLASS
+
+class ZygoteHook : ForceMountHookBase() {
+    override val TAG = "ZygoteHook"
+
+    private val forceMountData get() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA &&
+            service?.config?.forceMountData ?: false &&
+            sAppDataIsolationEnabled
+
+    override fun load() {
+        BulkHooker.instance.hookBefore(
+            ZYGOTE_PROCESS_CLASS,
+            "start",
+        ) { _, frame, _ ->
+            logD(TAG) { "@startZygoteProcess: Starting ${frame.args.contentToString()}" }
+
+            val caller = frame.args.lastOrNullWithType<String>() ?: return@hookBefore
+            val isHookEnabled = service?.isHookEnabled(caller) ?: false
+            if (!isHookEnabled) return@hookBefore
+
+            // another plan for PlatformCompatHook
+            if (forceMountData && !(service?.systemApps?.contains(caller) ?: false)) {
+                @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+                val lastMapIndex = frame.args.indexOfLast { it is java.util.Map<*, *> }
+                if (lastMapIndex >= 0) {
+                    // enable bindMountAppsData after checks
+                    val bindMountAppsDataIndex = lastMapIndex + 1
+                    if (frame.accessor().getArgumentShorty(bindMountAppsDataIndex) == 'Z') {
+                        val last = lastForceMountedApp.getAndSet(caller)
+                        if (last != caller) logI(TAG) { "@startZygoteProcess: force mountAppsData for $caller" }
+                        frame.setArgument(bindMountAppsDataIndex, true)
+                    }
+                }
+            }
+
+            // ignore if the GIDs array is null
+            val gIDsIndex = frame.args.indexOfFirst { it is IntArray }
+            if (gIDsIndex < 0) return@hookBefore
+
+            var perms = service?.getRestrictedZygotePermissions(caller) ?: return@hookBefore
+            if (perms.isNotEmpty()) {
+                val gIDs = frame.args[gIDsIndex] as IntArray
+
+                // add more security, reject if not available in GID_PAIRS
+                perms = perms.filter { Constants.GID_PAIRS.containsValue(it) }
+
+                logD(TAG) { "@startZygoteProcess: GIDs are ${gIDs.contentToString()}, removing $perms now" }
+                frame.setArgument(gIDsIndex, gIDs.filter { it !in perms }.toIntArray())
+                service?.increaseOthersFilterCount(caller)
+            }
+        }
+    }
+}

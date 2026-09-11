@@ -1,26 +1,26 @@
 <div align="center">
-  <h2>HMA-OSS</h2>
+  <h2>F-U Query Package</h2>
 
-  <img src="HideMyAss-OSS.svg" alt="HMA-OSS Logo" style="max-width:360px;width:60%;height:auto;">
+  <img src="FUQP.svg" alt="F-U Query Package Logo" style="max-width:360px;width:60%;height:auto;">
 
   <p>
-    <a href="https://github.com/frknkrc44/HMA-OSS" style="text-decoration:none">
-      <img src="https://img.shields.io/github/stars/frknkrc44/HMA-OSS?label=Stars&logo=github">
+    <a href="https://github.com/davidwkr/fuqp" style="text-decoration:none">
+      <img src="https://img.shields.io/github/stars/davidwkr/fuqp?label=Stars&logo=github">
     </a>
-    <a href="https://github.com/frknkrc44/HMA-OSS/actions" style="text-decoration:none">
-      <img src="https://img.shields.io/github/actions/workflow/status/frknkrc44/HMA-OSS/main.yml?branch=master&logo=github">
+    <a href="https://github.com/davidwkr/fuqp/actions" style="text-decoration:none">
+      <img src="https://img.shields.io/github/actions/workflow/status/davidwkr/fuqp/main.yml?branch=master&logo=github">
     </a>
-    <a href="https://github.com/frknkrc44/HMA-OSS/releases/latest" style="text-decoration:none">
-      <img src="https://img.shields.io/github/v/release/frknkrc44/HMA-OSS?label=Release">
+    <a href="https://github.com/davidwkr/fuqp/releases/latest" style="text-decoration:none">
+      <img src="https://img.shields.io/github/v/release/davidwkr/fuqp?label=Release">
     </a>
-    <a href="https://github.com/frknkrc44/HMA-OSS/releases/latest" style="text-decoration:none">
-      <img src="https://img.shields.io/github/downloads/frknkrc44/HMA-OSS/total">
+    <a href="https://github.com/davidwkr/fuqp/releases/latest" style="text-decoration:none">
+      <img src="https://img.shields.io/github/downloads/davidwkr/fuqp/total">
     </a>
     <a href="https://t.me/aerathfuns" style="text-decoration:none">
       <img src="https://img.shields.io/badge/Telegram-Channel-blue.svg?logo=telegram">
     </a>
     <a href="https://choosealicense.com/licenses/gpl-3.0/" style="text-decoration:none">
-      <img src="https://img.shields.io/github/license/frknkrc44/HMA-OSS?label=License">
+      <img src="https://img.shields.io/github/license/davidwkr/fuqp?label=License">
     </a>
   </p>
 </div>
@@ -41,12 +41,12 @@ Additionally, some apps use various loopholes to acquire your app list, in order
 
 This module can work as an Zygisk module to hide apps or reject app list requests.
 
-## About HMA-OSS
+## About F-U Query Package
 
-https://github.com/frknkrc44/HMA-OSS/wiki
+https://github.com/davidwkr/fuqp/wiki
 
 ## I want to contribute translation
 You can contribute translation [here](https://crowdin.com/project/frknkrc44-hma-oss).
 
 ## Update log
-[Reference to the commits page](https://github.com/frknkrc44/HMA-OSS/commits)
+[Reference to the commits page](https://github.com/davidwkr/fuqp/commits)

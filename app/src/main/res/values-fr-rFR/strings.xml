@@ -11,7 +11,7 @@
     <string name="title_app_settings">Réglages pour l\'application</string>
     <string name="title_about">A propos</string>
     <string name="title_about_fork">À propos de ce fork</string>
-    <string name="do_not_dual">Ne pas installer HMA dans l\'utilisateur secondaire</string>
+    <string name="do_not_dual">Ne pas installer F-U Query Package dans l\'utilisateur secondaire</string>
     <string name="show_crash_log">Afficher le journal de plantage</string>
     <string name="config_damaged">Fichier de configuration endommagé. Merci de nettoyer les données de l\'application</string>
     <string name="edit_list">Éditer la liste</string>
@@ -261,6 +261,6 @@
     <string name="dark_theme_off">Tout le temps désactivé</string>
     <string name="dark_theme_on">Tout le temps activé</string>
     <string name="sick_mode_title">Aucun hook n’est appliqué en raison de conflits potentiels avec le mode «Hide»</string>
-    <string name="sick_mode_description">HMA-OSS a détecté des modules potentiellement en conflits et limité ses fonctionnalités</string>
-    <string name="sick_mode_notice">Les configurations HMA/HMAL sont compatibles avec HMA-OSS et vous pouvez commencer à utiliser avec votre configuration existante, mais vous devez désinstaller HMA/HMAL puis redémarrer au premier</string>
+    <string name="sick_mode_description">F-U Query Package a détecté des modules potentiellement en conflits et limité ses fonctionnalités</string>
+    <string name="sick_mode_notice">Les configurations HMA/HMAL sont compatibles avec F-U Query Package et vous pouvez commencer à utiliser avec votre configuration existante, mais vous devez désinstaller HMA/HMAL puis redémarrer au premier</string>
 </resources>

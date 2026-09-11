@@ -11,7 +11,7 @@
     <string name="title_app_settings">앱 설정</string>
     <string name="title_about">정보</string>
     <string name="title_about_fork">이 포크 버전에 대하여</string>
-    <string name="do_not_dual">보조 사용자에게 HMA 설치하지 않음</string>
+    <string name="do_not_dual">보조 사용자에게 F-U Query Package 설치하지 않음</string>
     <string name="show_crash_log">충돌 로그 표시</string>
     <string name="config_damaged">설정 파일이 손상되었습니다. 앱 데이터를 삭제하세요.</string>
     <string name="edit_list">목록 편집</string>
@@ -38,7 +38,7 @@
     <string name="home_xposed_not_activated">모듈 활성화되지 않음</string>
     <string name="home_xposed_service_on">시스템 서비스 실행 중 [%d]</string>
     <string name="home_xposed_service_off">시스템 서비스 실행 중지</string>
-    <string name="home_xposed_filter_count">HMA-OSS가 총 %d개의 요청을 필터링했습니다.</string>
+    <string name="home_xposed_filter_count">F-U Query Package가 총 %d개의 요청을 필터링했습니다.</string>
     <string name="home_manage">관리</string>
     <string name="home_detection_test">탐지 테스트</string>
     <string name="home_download_test_app_title">테스트 앱 다운로드</string>
@@ -265,6 +265,6 @@
     <string name="dark_theme_off">항상 끄기</string>
     <string name="dark_theme_on">항상 켜기</string>
     <string name="sick_mode_title">제한 모드 활성화됨</string>
-    <string name="sick_mode_description">HMA-OSS가 충돌 가능성이 있는 모듈을 감지하여 기능을 제한했습니다.</string>
-    <string name="sick_mode_notice">HMA/HMAL 설정은 HMA-OSS와 호환되므로 기존 설정을 그대로 사용할 수 있습니다. 다만 먼저 HMA/HMAL을 제거한 후 재부팅해야 합니다.</string>
+    <string name="sick_mode_description">F-U Query Package가 충돌 가능성이 있는 모듈을 감지하여 기능을 제한했습니다.</string>
+    <string name="sick_mode_notice">HMA/HMAL 설정은 F-U Query Package와 호환되므로 기존 설정을 그대로 사용할 수 있습니다. 다만 먼저 HMA/HMAL을 제거한 후 재부팅해야 합니다.</string>
 </resources>

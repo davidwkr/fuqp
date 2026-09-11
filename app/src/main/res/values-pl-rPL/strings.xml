@@ -11,7 +11,7 @@
     <string name="title_app_settings">Ustawienia aplikacji</string>
     <string name="title_about">O</string>
     <string name="title_about_fork">O tym forku</string>
-    <string name="do_not_dual">Nie instaluj HMA na drugim użytkowniku</string>
+    <string name="do_not_dual">Nie instaluj F-U Query Package na drugim użytkowniku</string>
     <string name="show_crash_log">Pokaż dziennik awarii</string>
     <string name="config_damaged">Plik konfiguracyjny uszkodzony. Proszę wyczyścić dane aplikacji</string>
     <string name="edit_list">Edytuj listę</string>
@@ -38,7 +38,7 @@
     <string name="home_xposed_not_activated">Moduł nie aktywowany</string>
     <string name="home_xposed_service_on">Uruchomiono usługę systemową [%d]</string>
     <string name="home_xposed_service_off">Usługa systemowa nie jest uruchomiona</string>
-    <string name="home_xposed_filter_count">HMA-OSS przefiltrowało %d zapytań</string>
+    <string name="home_xposed_filter_count">F-U Query Package przefiltrowało %d zapytań</string>
     <string name="home_manage">Zarządzaj</string>
     <string name="home_detection_test">Test wykrywalności</string>
     <string name="home_download_test_app_title">Pobierz aplikację testową</string>
@@ -260,6 +260,6 @@ Ta aplikacja zachowuje się jak menadżer dla modułu Zygisk od teraz. Potrzebuj
     <string name="dark_theme_off">Zawsze wył.</string>
     <string name="dark_theme_on">Zawsze włą.</string>
     <string name="sick_mode_title">Tryb \"Sick\" jest aktywny</string>
-    <string name="sick_mode_description">HMA-OSS wykrył potencjalny konflikt modułów i ograniczył ich funkcjonalność</string>
-    <string name="sick_mode_notice">Konfiguracje HMA/HMAL są kompatybilne z HMA-OSS i możesz zacząć używać go z Twoim istniejącymi konfiguracjami, ale najpierw musisz odinstalować HMA/HMAL i zrebootować telefon</string>
+    <string name="sick_mode_description">F-U Query Package wykrył potencjalny konflikt modułów i ograniczył ich funkcjonalność</string>
+    <string name="sick_mode_notice">Konfiguracje HMA/HMAL są kompatybilne z F-U Query Package i możesz zacząć używać go z Twoim istniejącymi konfiguracjami, ale najpierw musisz odinstalować HMA/HMAL i zrebootować telefon</string>
 </resources>

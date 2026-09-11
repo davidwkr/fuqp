@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">HMA-OSS</string>
+    <string name="app_name" translatable="false">F-U Query Package</string>
 
     <string name="title_home">Home</string>
     <string name="title_logs">Logs</string>
@@ -14,7 +14,7 @@
     <string name="title_about">About</string>
     <string name="title_about_fork">About this fork</string>
 
-    <string name="do_not_dual">Do not install HMA to secondary user</string>
+    <string name="do_not_dual">Do not install F-U Query Package to secondary user</string>
     <string name="show_crash_log">Show crash log</string>
     <string name="config_damaged">Config file damaged. Please clean the app data</string>
     <string name="edit_list">Edit list</string>
@@ -42,7 +42,7 @@
     <string name="home_xposed_not_activated">Module Not Activated</string>
     <string name="home_xposed_service_on">System service running [%d]</string>
     <string name="home_xposed_service_off">System service not running</string>
-    <string name="home_xposed_filter_count">HMA-OSS has filtered total %d requests</string>
+    <string name="home_xposed_filter_count">F-U Query Package has filtered total %d requests</string>
     <string name="home_manage">Manage</string>
     <string name="home_detection_test">Detection test</string>
     <string name="home_download_test_app_title">Download test app</string>
@@ -291,6 +291,6 @@
     <string name="dark_theme_on">Always on</string>
 
     <string name="sick_mode_title">Sick mode is activated</string>
-    <string name="sick_mode_description">HMA-OSS detected possibly conflictable modules and limited its functionality</string>
-    <string name="sick_mode_notice">HMA/HMAL configs are compatible with HMA-OSS and you can begin to use with your existing config but you need to uninstall HMA/HMAL then reboot at first</string>
+    <string name="sick_mode_description">F-U Query Package detected possibly conflictable modules and limited its functionality</string>
+    <string name="sick_mode_notice">HMA/HMAL configs are compatible with F-U Query Package and you can begin to use with your existing config but you need to uninstall HMA/HMAL then reboot at first</string>
 </resources>

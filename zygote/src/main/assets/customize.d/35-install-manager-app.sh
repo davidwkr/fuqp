@@ -9,13 +9,13 @@ install_pkg() {
 }
 
 # we need to determine the manager app was installed or not at first
-if test -n "$(pm list packages --user -1 org.frknkrc44.hma_oss)"
+if test -n "$(pm list packages --user -1 com.iodvd.fuqp)"
 then
   # determine the installed user
   for user in $(pm list users | cut -f1 -d: | cut -f2 -d{ | tail -n +2)
   do
     # if path detected in user then install the manager app for it (except Xiaomi's dual app space)
-    if [ "$user" != "999" ] && pm path --user $user org.frknkrc44.hma_oss &> /dev/null
+    if [ "$user" != "999" ] && pm path --user $user com.iodvd.fuqp &> /dev/null
     then
       ui_print "- Installing manager app update for user "$user
 

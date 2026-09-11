@@ -11,7 +11,7 @@
     <string name="title_app_settings">Definições do app</string>
     <string name="title_about">Acerca</string>
     <string name="title_about_fork">Sobre este fork</string>
-    <string name="do_not_dual">Não instalar o HMA no utilizador secundário</string>
+    <string name="do_not_dual">Não instalar o F-U Query Package no utilizador secundário</string>
     <string name="show_crash_log">Mostrar registo de erros</string>
     <string name="config_damaged">Ficheiro de configuração danificado. Limpe os dados do app</string>
     <string name="edit_list">Editar lista</string>
@@ -38,7 +38,7 @@
     <string name="home_xposed_not_activated">Módulo não ativado</string>
     <string name="home_xposed_service_on">Serviço do sistema em execução [%d]</string>
     <string name="home_xposed_service_off">Serviço do sistema parado</string>
-    <string name="home_xposed_filter_count">HMA-OSS filtrou um total de %d pedidos</string>
+    <string name="home_xposed_filter_count">F-U Query Package filtrou um total de %d pedidos</string>
     <string name="home_manage">Gerir</string>
     <string name="home_detection_test">Teste de deteção</string>
     <string name="home_download_test_app_title">Transferir app de teste</string>
@@ -266,6 +266,6 @@
     <string name="dark_theme_off">Sempre desligado</string>
     <string name="dark_theme_on">Sempre ligado</string>
     <string name="sick_mode_title">O modo doente está ativado</string>
-    <string name="sick_mode_description">O HMA-OSS detetou módulos possivelmente conflituosos e limitou a sua funcionalidade</string>
-    <string name="sick_mode_notice">As configurações do HMA/HMAL são compatíveis com o HMA-OSS e pode começar a usá-lo com a sua configuração existente, mas primeiro precisa de desinstalar o HMA/HMAL e reiniciar</string>
+    <string name="sick_mode_description">O F-U Query Package detetou módulos possivelmente conflituosos e limitou a sua funcionalidade</string>
+    <string name="sick_mode_notice">As configurações do HMA/HMAL são compatíveis com o F-U Query Package e pode começar a usá-lo com a sua configuração existente, mas primeiro precisa de desinstalar o HMA/HMAL e reiniciar</string>
 </resources>

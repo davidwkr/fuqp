@@ -6,37 +6,37 @@
 
     <fragment
         android:id="@+id/nav_home"
-        android:name="org.frknkrc44.hma_oss.ui.fragment.HomeFragment"
+        android:name="com.iodvd.fuqp.ui.fragment.HomeFragment"
         android:label="@string/title_home" />
 
     <fragment
         android:id="@+id/nav_logs"
-        android:name="org.frknkrc44.hma_oss.ui.fragment.TabbedLogsFragment"
+        android:name="com.iodvd.fuqp.ui.fragment.TabbedLogsFragment"
         android:label="@string/title_logs" />
 
     <fragment
         android:id="@+id/nav_settings"
-        android:name="icu.nullptr.hidemyapplist.ui.fragment.SettingsFragment"
+        android:name="com.iodvd.fuqp.ui.fragment.SettingsFragment"
         android:label="@string/title_settings" />
 
     <fragment
         android:id="@+id/nav_about"
-        android:name="org.frknkrc44.hma_oss.ui.fragment.AboutFragment"
+        android:name="com.iodvd.fuqp.ui.fragment.AboutFragment"
         android:label="@string/title_about" />
 
     <fragment
         android:id="@+id/nav_template_manage"
-        android:name="icu.nullptr.hidemyapplist.ui.fragment.TemplateManageFragment"
+        android:name="com.iodvd.fuqp.ui.fragment.TemplateManageFragment"
         android:label="@string/title_template_manage" />
 
     <fragment
         android:id="@+id/nav_presets"
-        android:name="org.frknkrc44.hma_oss.ui.fragment.PresetManageFragment"
+        android:name="com.iodvd.fuqp.ui.fragment.PresetManageFragment"
         android:label="@string/title_preset_manage" />
 
     <fragment
         android:id="@+id/nav_template_settings"
-        android:name="icu.nullptr.hidemyapplist.ui.fragment.TemplateSettingsFragment"
+        android:name="com.iodvd.fuqp.ui.fragment.TemplateSettingsFragment"
         android:label="@string/title_template_settings">
 
         <argument
@@ -52,7 +52,7 @@
 
     <fragment
         android:id="@+id/nav_bulk_config_wizard"
-        android:name="org.frknkrc44.hma_oss.ui.fragment.BulkConfigWizardFragment"
+        android:name="com.iodvd.fuqp.ui.fragment.BulkConfigWizardFragment"
         android:label="@string/title_template_settings">
 
         <argument
@@ -68,7 +68,7 @@
 
     <fragment
         android:id="@+id/nav_setting_template_conf"
-        android:name="org.frknkrc44.hma_oss.ui.fragment.SettingsTemplateConfFragment"
+        android:name="com.iodvd.fuqp.ui.fragment.SettingsTemplateConfFragment"
         android:label="@string/title_settings_template_conf">
 
         <argument
@@ -80,12 +80,12 @@
 
     <fragment
         android:id="@+id/nav_app_manage"
-        android:name="icu.nullptr.hidemyapplist.ui.fragment.AppManageFragment"
+        android:name="com.iodvd.fuqp.ui.fragment.AppManageFragment"
         android:label="@string/title_app_manage" />
 
     <fragment
         android:id="@+id/nav_preset_inner_manage"
-        android:name="org.frknkrc44.hma_oss.ui.fragment.AppPresetFragment">
+        android:name="com.iodvd.fuqp.ui.fragment.AppPresetFragment">
 
         <argument
             android:name="name"
@@ -99,7 +99,7 @@
 
     <fragment
         android:id="@+id/nav_settings_templates_edit_setting"
-        android:name="org.frknkrc44.hma_oss.ui.fragment.EditSettingFragment">
+        android:name="com.iodvd.fuqp.ui.fragment.EditSettingFragment">
 
         <argument
             android:name="database"
@@ -119,7 +119,7 @@
 
     <fragment
         android:id="@+id/nav_settings_preset_inner_manage"
-        android:name="org.frknkrc44.hma_oss.ui.fragment.SettingsPresetFragment">
+        android:name="com.iodvd.fuqp.ui.fragment.SettingsPresetFragment">
 
         <argument
             android:name="name"
@@ -133,7 +133,7 @@
 
     <fragment
         android:id="@+id/nav_settings_template_inner_manage"
-        android:name="org.frknkrc44.hma_oss.ui.fragment.SettingsTemplateInnerFragment">
+        android:name="com.iodvd.fuqp.ui.fragment.SettingsTemplateInnerFragment">
 
         <argument
             android:name="items"
@@ -143,7 +143,7 @@
 
     <fragment
         android:id="@+id/nav_app_settings"
-        android:name="org.frknkrc44.hma_oss.ui.fragment.AppSettingsV2Fragment"
+        android:name="com.iodvd.fuqp.ui.fragment.AppSettingsV2Fragment"
         android:label="@string/title_app_settings">
 
         <argument
@@ -177,7 +177,7 @@
 
     <fragment
         android:id="@+id/nav_scope"
-        android:name="icu.nullptr.hidemyapplist.ui.fragment.ScopeFragment"
+        android:name="com.iodvd.fuqp.ui.fragment.ScopeFragment"
         android:label="@string/title_app_select">
 
         <argument
@@ -207,7 +207,7 @@
 
     <fragment
         android:id="@+id/nav_backup_restore"
-        android:name="org.frknkrc44.hma_oss.ui.fragment.BackupRestoreFragment">
+        android:name="com.iodvd.fuqp.ui.fragment.BackupRestoreFragment">
 
         <argument
             android:name="isBackupMode"

@@ -11,7 +11,7 @@
     <string name="title_app_settings">Cấu hình ứng dụng</string>
     <string name="title_about">Giới thiệu</string>
     <string name="title_about_fork">Thông tin về dự án này</string>
-    <string name="do_not_dual">Không cài đặt HMA-OSS cho người dùng phụ</string>
+    <string name="do_not_dual">Không cài đặt F-U Query Package cho người dùng phụ</string>
     <string name="show_crash_log">Xem nhật ký lỗi</string>
     <string name="config_damaged">Tệp cấu hình đã bị hỏng. Hãy xóa dữ liệu của ứng dụng</string>
     <string name="edit_list">Sửa danh sách</string>
@@ -38,7 +38,7 @@
     <string name="home_xposed_not_activated">Mô-đun chưa Kích hoạt</string>
     <string name="home_xposed_service_on">Dịch vụ hệ thống đang chạy [%d]</string>
     <string name="home_xposed_service_off">Dịch vụ hệ thống đang không chạy</string>
-    <string name="home_xposed_filter_count">HMA-OSS đã lọc tổng cộng %d yêu cầu</string>
+    <string name="home_xposed_filter_count">F-U Query Package đã lọc tổng cộng %d yêu cầu</string>
     <string name="home_manage">Quản lý</string>
     <string name="home_detection_test">Thử phát hiện</string>
     <string name="home_download_test_app_title">Tải ứng dụng kiểm tra</string>
@@ -265,6 +265,6 @@
     <string name="dark_theme_off">Luôn tắt</string>
     <string name="dark_theme_on">Luôn bật</string>
     <string name="sick_mode_title">Chế độ an toàn đã kích hoạt</string>
-    <string name="sick_mode_description">HMA-OSS đã phát hiện các mô-đun thể gây xung đột và đã hạn chế một số tính năng</string>
-    <string name="sick_mode_notice">HMA-OSS có tương thích với cấu hình của HMA/HMAL và bạn có thể sử dụng cấu hình hiện có. Tuy nhiên bạn cần gỡ cài đặt HMA/HMAL và khởi động lại máy trước</string>
+    <string name="sick_mode_description">F-U Query Package đã phát hiện các mô-đun thể gây xung đột và đã hạn chế một số tính năng</string>
+    <string name="sick_mode_notice">F-U Query Package có tương thích với cấu hình của HMA/HMAL và bạn có thể sử dụng cấu hình hiện có. Tuy nhiên bạn cần gỡ cài đặt HMA/HMAL và khởi động lại máy trước</string>
 </resources>

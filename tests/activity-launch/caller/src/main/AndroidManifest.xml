@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <queries>
+        <package android:name="com.iodvd.fuqp.probe.target" />
+    </queries>
+    <application android:label="FUQP launch probe" android:theme="@android:style/Theme.Material.Light.NoActionBar" android:allowBackup="false">
+        <activity android:name=".ProbeActivity" android:exported="false" />
+    </application>
+    <instrumentation android:name="com.iodvd.fuqp.probe.ProbeInstrumentation" android:targetPackage="${applicationId}" android:functionalTest="true" />
+</manifest>

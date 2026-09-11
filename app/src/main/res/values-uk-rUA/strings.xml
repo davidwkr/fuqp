@@ -11,7 +11,7 @@
     <string name="title_app_settings">Налаштування додатка</string>
     <string name="title_about">Про додаток</string>
     <string name="title_about_fork">Про цей клон</string>
-    <string name="do_not_dual">Не встановлюйте HMA для додаткового користувача</string>
+    <string name="do_not_dual">Не встановлюйте F-U Query Package для додаткового користувача</string>
     <string name="show_crash_log">Показати журнал збоїв</string>
     <string name="config_damaged">Файл конфігурації пошкоджено. Очистіть дані додатку</string>
     <string name="edit_list">Редагувати список</string>
@@ -38,7 +38,7 @@
     <string name="home_xposed_not_activated">Модуль не активовано</string>
     <string name="home_xposed_service_on">Системна служба працює [%d]</string>
     <string name="home_xposed_service_off">Системна служба не працює</string>
-    <string name="home_xposed_filter_count">HMA-OSS відфільтрував %d запитів</string>
+    <string name="home_xposed_filter_count">F-U Query Package відфільтрував %d запитів</string>
     <string name="home_manage">Керувати</string>
     <string name="home_detection_test">Перевірка на виявлення</string>
     <string name="home_download_test_app_title">Завантажити додаток для перевірки</string>
@@ -261,6 +261,6 @@
     <string name="dark_theme_off">Завжди вимкнено</string>
     <string name="dark_theme_on">Завжди ввімкнено</string>
     <string name="sick_mode_title">Sick mode is activated</string>
-    <string name="sick_mode_description">HMA-OSS detected possibly conflictable modules and limited its functionality</string>
-    <string name="sick_mode_notice">HMA/HMAL configs are compatible with HMA-OSS and you can begin to use with your existing config but you need to uninstall HMA/HMAL then reboot at first</string>
+    <string name="sick_mode_description">F-U Query Package detected possibly conflictable modules and limited its functionality</string>
+    <string name="sick_mode_notice">HMA/HMAL configs are compatible with F-U Query Package and you can begin to use with your existing config but you need to uninstall HMA/HMAL then reboot at first</string>
 </resources>

@@ -30,7 +30,7 @@
             android:layout_height="wrap_content"
             android:fontFamily="monospace"
             android:textAppearance="?textAppearanceTitleSmall"
-            tools:text="HMA-Bridge" />
+            tools:text="FUQP-Bridge" />
 
         <com.google.android.material.textview.MaterialTextView
             android:id="@+id/message"
@@ -40,7 +40,7 @@
             android:fontFamily="monospace"
             android:inputType="textMultiLine"
             android:textAppearance="?textAppearanceBodySmall"
-            tools:text="HMA service initialized" />
+            tools:text="FUQP service initialized" />
 
         <com.google.android.material.textview.MaterialTextView
             android:id="@+id/date"

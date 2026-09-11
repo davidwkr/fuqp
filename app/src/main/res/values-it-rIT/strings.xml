@@ -11,7 +11,7 @@
     <string name="title_app_settings">Impostazioni app</string>
     <string name="title_about">A proposito</string>
     <string name="title_about_fork">Informazioni su questo fork</string>
-    <string name="do_not_dual">Non installare HMA per l\'utente secondario</string>
+    <string name="do_not_dual">Non installare F-U Query Package per l\'utente secondario</string>
     <string name="show_crash_log">Mostra crash log</string>
     <string name="config_damaged">File di configurazione danneggiato. Per favore cancella i dati dell\'app</string>
     <string name="edit_list">Modifica lista</string>
@@ -38,7 +38,7 @@
     <string name="home_xposed_not_activated">Modulo non attivato</string>
     <string name="home_xposed_service_on">Servizio di sistema in esecuzione [%d]</string>
     <string name="home_xposed_service_off">Servizio di sistema stoppato</string>
-    <string name="home_xposed_filter_count">HMA-OSS ha filtrato in totale %d richieste</string>
+    <string name="home_xposed_filter_count">F-U Query Package ha filtrato in totale %d richieste</string>
     <string name="home_manage">Gestisci</string>
     <string name="home_detection_test">Test di rilevamento</string>
     <string name="home_download_test_app_title">Scarica app di test</string>
@@ -262,6 +262,6 @@ Questa applicazione funge da manager del modulo Zygisk, quindi è necessario un 
     <string name="dark_theme_off">Sempre spento</string>
     <string name="dark_theme_on">Sempre acceso</string>
     <string name="sick_mode_title">Modalità malattia attivata</string>
-    <string name="sick_mode_description">HMA-OSS ha rilevato moduli potenzialmente in conflitto e ne ha limitato la funzionalità</string>
-    <string name="sick_mode_notice">Le configurazioni HMA/HMAL sono compatibili con HMA-OSS e puoi iniziare a usare con la tua configurazione esistente, ma devi disinstallare HMA/HMAL poi riavviare all\'inizio</string>
+    <string name="sick_mode_description">F-U Query Package ha rilevato moduli potenzialmente in conflitto e ne ha limitato la funzionalità</string>
+    <string name="sick_mode_notice">Le configurazioni HMA/HMAL sono compatibili con F-U Query Package e puoi iniziare a usare con la tua configurazione esistente, ma devi disinstallare HMA/HMAL poi riavviare all\'inizio</string>
 </resources>

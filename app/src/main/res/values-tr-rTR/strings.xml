@@ -11,7 +11,7 @@
     <string name="title_app_settings">Uygulama ayarları</string>
     <string name="title_about">Hakkında</string>
     <string name="title_about_fork">Bu çatal hakkında</string>
-    <string name="do_not_dual">HMA’yı ikincil kullanıcıya yüklemeyin</string>
+    <string name="do_not_dual">F-U Query Package’yı ikincil kullanıcıya yüklemeyin</string>
     <string name="show_crash_log">Çökme kaydını göster</string>
     <string name="config_damaged">Yapılandırma dosyası hasarlı. Lütfen uygulama verilerini temizleyin</string>
     <string name="edit_list">Listeyi düzenle</string>
@@ -38,7 +38,7 @@
     <string name="home_xposed_not_activated">Modül Etkin Değil</string>
     <string name="home_xposed_service_on">Sistem servisi çalışıyor [%d]</string>
     <string name="home_xposed_service_off">Sistem servisi çalışmıyor</string>
-    <string name="home_xposed_filter_count">HMA-OSS toplam %d isteği filtreledi</string>
+    <string name="home_xposed_filter_count">F-U Query Package toplam %d isteği filtreledi</string>
     <string name="home_manage">Yönet</string>
     <string name="home_detection_test">Tespit testi</string>
     <string name="home_download_test_app_title">Test uygulaması indir</string>
@@ -262,6 +262,6 @@
     <string name="dark_theme_off">Her zaman kapalı</string>
     <string name="dark_theme_on">Her zaman açık</string>
     <string name="sick_mode_title">Hasta modu etkin</string>
-    <string name="sick_mode_description">HMA-OSS potansiyel çakışabilecek modüller bulduğundan ötürü özelliklerini kısıtladı</string>
-    <string name="sick_mode_notice">HMA/HMAL yapılandırmaları HMA-OSS ile uyumludur ve önceki yapılandırma yedeğini bu modülde kullanabilirsiniz ancak öncesinde HMA/HMAL\'yi kaldırıp yeniden başlatmanız gerekiyor</string>
+    <string name="sick_mode_description">F-U Query Package potansiyel çakışabilecek modüller bulduğundan ötürü özelliklerini kısıtladı</string>
+    <string name="sick_mode_notice">HMA/HMAL yapılandırmaları F-U Query Package ile uyumludur ve önceki yapılandırma yedeğini bu modülde kullanabilirsiniz ancak öncesinde HMA/HMAL\'yi kaldırıp yeniden başlatmanız gerekiyor</string>
 </resources>

@@ -11,7 +11,7 @@
     <string name="title_app_settings">Setări aplicație</string>
     <string name="title_about">Despre</string>
     <string name="title_about_fork">Despre acest fork</string>
-    <string name="do_not_dual">Nu instalați HMA pe al doilea utilizator</string>
+    <string name="do_not_dual">Nu instalați F-U Query Package pe al doilea utilizator</string>
     <string name="show_crash_log">Arată jurnalul de erori</string>
     <string name="config_damaged">Fișier de configurare corupt. Vă rugăm să curățați datele aplicației</string>
     <string name="edit_list">Lista de editare</string>
@@ -38,7 +38,7 @@
     <string name="home_xposed_not_activated">Modul Dezactivat</string>
     <string name="home_xposed_service_on">Serviciul de sistem rulează [%d]</string>
     <string name="home_xposed_service_off">Serviciul de sistem nu funcționează</string>
-    <string name="home_xposed_filter_count">HMA-SSS a filtrat in total %d cereri</string>
+    <string name="home_xposed_filter_count">F-U Query Package a filtrat in total %d cereri</string>
     <string name="home_manage">Gestionează</string>
     <string name="home_detection_test">Test de detectare</string>
     <string name="home_download_test_app_title">Descărcă aplicație de test</string>
@@ -263,6 +263,6 @@
     <string name="dark_theme_off">Întotdeauna oprit</string>
     <string name="dark_theme_on">Întotdeauna pornit</string>
     <string name="sick_mode_title">Modul Sick este activat</string>
-    <string name="sick_mode_description">HMA-OSS a detectat posibile module conflictuale și și-a limitat funcționalitatea</string>
-    <string name="sick_mode_notice">Configurațiile HMA/HMAL sunt compatibile cu HMA-OSS și puteți începe să le folosiți, însă va trebui sa dezinstalați HMA/HMAL și să reporniți mai întâi</string>
+    <string name="sick_mode_description">F-U Query Package a detectat posibile module conflictuale și și-a limitat funcționalitatea</string>
+    <string name="sick_mode_notice">Configurațiile HMA/HMAL sunt compatibile cu F-U Query Package și puteți începe să le folosiți, însă va trebui sa dezinstalați HMA/HMAL și să reporniți mai întâi</string>
 </resources>

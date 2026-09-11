@@ -13,7 +13,7 @@ ZYGISK_DETECTED_MSG(){
 }
 FALLBACK_ZYGISK_NAME="Zygisk"
 ZYGISK_MULTI_ERR="! Multiple Zygisk frameworks were found. Aborting installation to prevent conflicts"
-ZYGISK_NOT_FOUND_ERR="! No known Zygisk frameworks (e.g. ZygiskNext) is found, HMA-OSS requires Zygisk to work. Installation aborted"
+ZYGISK_NOT_FOUND_ERR="! No known Zygisk frameworks (e.g. ZygiskNext) is found, F-U Query Package requires Zygisk to work. Installation aborted"
 
 # language pack
 if echo "$SYSTEM_LANG" | grep -q "zh"; then
@@ -21,7 +21,7 @@ if echo "$SYSTEM_LANG" | grep -q "zh"; then
         echo "- 检测到 $1 框架"
     }
     ZYGISK_MULTI_ERR="! 检测到多个 Zygisk 框架, 为了避免冲突, 安装程序已退出"
-    ZYGISK_NOT_FOUND_ERR="! 未找到已知的 Zygisk 框架 (例如 ZygiskNext), HMA-OSS 需要 Zygisk 才能正常运行, 安装程序已退出"
+    ZYGISK_NOT_FOUND_ERR="! 未找到已知的 Zygisk 框架 (例如 ZygiskNext), F-U Query Package 需要 Zygisk 才能正常运行, 安装程序已退出"
 fi
 
 

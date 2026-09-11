@@ -24,7 +24,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "HMA-OSS"
+rootProject.name = "FUQP"
 
 include(
     ":app",
