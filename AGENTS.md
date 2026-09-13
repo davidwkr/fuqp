@@ -67,3 +67,29 @@ translations only for mechanical substitutions such as a product rename; real wo
 belong in Crowdin.
 
 `app_name` is `translatable="false"`, so it lives only in the source file.
+
+`settings_data_isolation_summary` takes three arguments and uses **positional** specifiers
+(`%1$s`, `%2$s`, `%3$s`) in every locale. They were converted by hand across all 26 files;
+Crowdin still has the old bare `%s` in its translation memory, so the next Crowdin sync will
+revert them unless the source string is updated in Crowdin first.
+
+## Resource size limit
+
+aapt2 cannot encode a string longer than 32767 bytes into the resource string pool — it
+silently substitutes the literal `STRING_TOO_LARGE`, which turns the affected resource into
+garbage at inflate time rather than failing the build.
+
+`app/src/main/res/drawable/ic_launcher_alt_5_foreground.xml` is a traced illustration whose
+largest `pathData` sits at ~31.7 KB, about 1 KB under that ceiling. It was brought under the
+limit losslessly (dropping zero-length `v0` no-ops and redundant leading zeros — no coordinate
+was changed). **If this asset is ever re-exported from the source art it will very likely blow
+the limit again.** Check with:
+
+```
+python3 - <<'EOF'
+import re,glob
+for f in glob.glob('app/src/main/res/**/*.xml', recursive=True):
+    for m in re.finditer(r'="([^"]*)"', open(f, encoding='utf-8').read()):
+        if len(m.group(1).encode()) > 32767: print(f, len(m.group(1)))
+EOF
+```

@@ -88,3 +88,6 @@ xposed/
 
 # ide files
 .vscode/
+
+# local coding-agent state (.claude_audit.log is already covered by *.log)
+.claude_project_auto_accept

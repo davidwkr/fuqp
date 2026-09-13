@@ -162,7 +162,7 @@
     <string name="settings_overwrite_summary">Opcje tej kategorii zostaną wymuszone jakby były włączone, jeżeli te przełączniki zostaną zaznaczone</string>
     <string name="settings_default_value">Wartość domyślna: %s</string>
     <string name="settings_data_isolation">Izolacja danych</string>
-    <string name="settings_data_isolation_summary">Dane aplikacji: %s\nDane aplikacji Vold: %s\nWymuszone montowanie: %s</string>
+    <string name="settings_data_isolation_summary">Dane aplikacji: %1$s\nDane aplikacji Vold: %2$s\nWymuszone montowanie: %3$s</string>
     <string name="settings_data_isolation_unsupported">Ta opcja jest tylko dostępna na Androidzie 11 i wyżej</string>
     <string name="settings_app_data_isolation">Izolacja danych aplikacji</string>
     <string name="settings_vold_app_data_isolation">Izolacja danych aplikacji usługi Vold</string>

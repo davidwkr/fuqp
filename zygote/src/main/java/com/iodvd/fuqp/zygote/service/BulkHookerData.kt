@@ -24,4 +24,11 @@ data class HookElement(
     var memoryAddresses: Pair<Long, Long>? = null,
     var hookFinished: Boolean = false,
     val paramCount: Int = -1,
+    /**
+     * The exact parameter list to bind to, for when name and arity do not name
+     * one method. Arity alone reselects blindly among equal-arity overloads,
+     * which can attach the hook to a method other than the one whose signature
+     * was checked - and the argument indices were checked against.
+     */
+    val paramTypes: List<Class<*>>? = null,
 )

@@ -162,8 +162,8 @@
     <string name="settings_overwrite_summary">هذا الصنف من الفقرات سيتم إجبارها على كونها مفعلة إذا تم تفعيل الخيارات</string>
     <string name="settings_default_value">القيمة الافتراضية: %s</string>
     <string name="settings_data_isolation">عزل البيانات</string>
-    <string name="settings_data_isolation_summary">بيانات التطبيق:%s\n بيانات قبة التطبيق:%s\n
-نصب إجباري: %s\n</string>
+    <string name="settings_data_isolation_summary">بيانات التطبيق:%1$s\n بيانات قبة التطبيق:%2$s\n
+نصب إجباري: %3$s\n</string>
     <string name="settings_data_isolation_unsupported">هذا الخِيار متاح فقط لإصدار أندرويد 11 فأعلى</string>
     <string name="settings_app_data_isolation">عزل بيانات التطبيق</string>
     <string name="settings_vold_app_data_isolation">عزل بيانات قبة التطبيق</string>

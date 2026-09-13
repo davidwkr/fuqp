@@ -162,7 +162,7 @@
     <string name="settings_overwrite_summary">Τα στοιχεία αυτής της κατηγορίας θα επιβληθούν ως ενεργοποιημένα εάν οι διακόπτες είναι επιλεγμένοι</string>
     <string name="settings_default_value">Προεπιλεγμένη τιμή: %s</string>
     <string name="settings_data_isolation">Απομόνωση δεδομένων</string>
-    <string name="settings_data_isolation_summary">Δεδομένα εφαρμογής: %s\nΔεδομένα εφαρμογής Vold: %s\nΕπιβολή προσάρτησης: %s</string>
+    <string name="settings_data_isolation_summary">Δεδομένα εφαρμογής: %1$s\nΔεδομένα εφαρμογής Vold: %2$s\nΕπιβολή προσάρτησης: %3$s</string>
     <string name="settings_data_isolation_unsupported">Αυτή η επιλογή είναι διαθέσιμη μόνο στο Android 11 και νεότερη έκδοση</string>
     <string name="settings_app_data_isolation">Απομόνωση δεδομένων εφαρμογής</string>
     <string name="settings_vold_app_data_isolation">Απομόνωση δεδομένων εφαρμογής Vold</string>

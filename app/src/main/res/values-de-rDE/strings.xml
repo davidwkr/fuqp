@@ -162,7 +162,7 @@
     <string name="settings_overwrite_summary">Diese Kategorieelemente werden als aktiviert erzwungen, wenn die Schalter aktiviert sind</string>
     <string name="settings_default_value">Standardwert: %s</string>
     <string name="settings_data_isolation">Daten-Isolation</string>
-    <string name="settings_data_isolation_summary">App-Daten: %s\nVold App-Daten: %s\nErzwinge Einhängen: %s</string>
+    <string name="settings_data_isolation_summary">App-Daten: %1$s\nVold App-Daten: %2$s\nErzwinge Einhängen: %3$s</string>
     <string name="settings_data_isolation_unsupported">Diese Option ist nur für Android 11 und höher verfügbar</string>
     <string name="settings_app_data_isolation">Anwendungsdatenisolation</string>
     <string name="settings_vold_app_data_isolation">Vold-App-Datenisolation</string>

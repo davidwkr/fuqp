@@ -162,7 +162,7 @@
     <string name="settings_overwrite_summary">Елементи цієї категорії будуть примусово ввімкнені, якщо перемикачі відмічені</string>
     <string name="settings_default_value">Значення за замовчуванням: %s</string>
     <string name="settings_data_isolation">Ізоляція даних</string>
-    <string name="settings_data_isolation_summary">Дані додатку: %s\nПопередні дані додатку: %s\nПримусове монтування: %s</string>
+    <string name="settings_data_isolation_summary">Дані додатку: %1$s\nПопередні дані додатку: %2$s\nПримусове монтування: %3$s</string>
     <string name="settings_data_isolation_unsupported">Цей параметр доступний лише на Android 11 і вище</string>
     <string name="settings_app_data_isolation">Ізоляція даних додатку</string>
     <string name="settings_vold_app_data_isolation">Ізоляція даних додатку Vold</string>

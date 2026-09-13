@@ -162,7 +162,7 @@
     <string name="settings_overwrite_summary">이 스위치를 켜면 해당 카테고리 항목이 강제로 활성화됩니다.</string>
     <string name="settings_default_value">기본값: %s</string>
     <string name="settings_data_isolation">데이터 격리</string>
-    <string name="settings_data_isolation_summary">앱 데이터: %s\nVold 앱 데이터: %s\n강제 마운트: %s</string>
+    <string name="settings_data_isolation_summary">앱 데이터: %1$s\nVold 앱 데이터: %2$s\n강제 마운트: %3$s</string>
     <string name="settings_data_isolation_unsupported">이 옵션은 Android 11 이상에서만 사용할 수 있습니다.</string>
     <string name="settings_app_data_isolation">앱 데이터 격리</string>
     <string name="settings_vold_app_data_isolation">Vold 앱 데이터 격리</string>

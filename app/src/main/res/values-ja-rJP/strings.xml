@@ -162,7 +162,7 @@
     <string name="settings_overwrite_summary">このカテゴリの項目は、スイッチがチェックされている場合、強制的に有効になります</string>
     <string name="settings_default_value">デフォルト値: %s</string>
     <string name="settings_data_isolation">データ分離</string>
-    <string name="settings_data_isolation_summary">アプリデータ: %s\nVold アプリデータ: %s\n強制マウント: %s</string>
+    <string name="settings_data_isolation_summary">アプリデータ: %1$s\nVold アプリデータ: %2$s\n強制マウント: %3$s</string>
     <string name="settings_data_isolation_unsupported">このオプションは Android 11 以降でのみ利用可能です</string>
     <string name="settings_app_data_isolation">アプリのデータ分離</string>
     <string name="settings_vold_app_data_isolation">Vold アプリのデータ分離</string>

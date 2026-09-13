@@ -162,7 +162,7 @@
     <string name="settings_overwrite_summary">Os itens desta categoria serão forçados como ativados se os seletores estiverem marcados</string>
     <string name="settings_default_value">Valor padrão: %s</string>
     <string name="settings_data_isolation">Isolamento de dados</string>
-    <string name="settings_data_isolation_summary">Dados do app: %s\nDados Vold dos apps: %s\nForçar montagem: %s</string>
+    <string name="settings_data_isolation_summary">Dados do app: %1$s\nDados Vold dos apps: %2$s\nForçar montagem: %3$s</string>
     <string name="settings_data_isolation_unsupported">Esta opção só está disponível no Android 11 ou superior</string>
     <string name="settings_app_data_isolation">Isolamento de dados do app</string>
     <string name="settings_vold_app_data_isolation">Isolamento dos dados Vold do app</string>

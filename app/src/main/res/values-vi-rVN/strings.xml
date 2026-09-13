@@ -162,7 +162,7 @@
     <string name="settings_overwrite_summary">Các mục trong danh mục này sẽ bị buộc phải bật nếu các công tắc được chọn</string>
     <string name="settings_default_value">Giá trị mặc định: %s</string>
     <string name="settings_data_isolation">Cách ly dữ liệu</string>
-    <string name="settings_data_isolation_summary">Dữ liệu ứng dụng: %s\nDữ liệu ứng dụng (Vold): %s\nBuộc gắn bộ nhớ: %s</string>
+    <string name="settings_data_isolation_summary">Dữ liệu ứng dụng: %1$s\nDữ liệu ứng dụng (Vold): %2$s\nBuộc gắn bộ nhớ: %3$s</string>
     <string name="settings_data_isolation_unsupported">Tùy chọn này chỉ khả dụng trên Android 11 trở lên</string>
     <string name="settings_app_data_isolation">Cách ly dữ liệu của ứng dụng</string>
     <string name="settings_vold_app_data_isolation">Buộc cách ly dữ liệu ứng dụng</string>

@@ -162,7 +162,7 @@
     <string name="settings_overwrite_summary">Элементы этой категории будут принудительно включены, если будут включены переключатели</string>
     <string name="settings_default_value">Значение по умолчанию: %s</string>
     <string name="settings_data_isolation">Изоляция данных</string>
-    <string name="settings_data_isolation_summary">Данные приложения: %s\nVold-данные приложения: %s\nПринудительное монтирование: %s</string>
+    <string name="settings_data_isolation_summary">Данные приложения: %1$s\nVold-данные приложения: %2$s\nПринудительное монтирование: %3$s</string>
     <string name="settings_data_isolation_unsupported">Это опция доступна только на Android 11 и выше</string>
     <string name="settings_app_data_isolation">Изоляция данных приложений</string>
     <string name="settings_vold_app_data_isolation">Изоляция Vold-данных приложений</string>

@@ -162,7 +162,7 @@
     <string name="settings_overwrite_summary">Los elementos de esta categoría serán forzados como habilitados si los interruptores son marcados</string>
     <string name="settings_default_value">Valor por defecto: %s</string>
     <string name="settings_data_isolation">Aislar datos de apps en almacenamiento</string>
-    <string name="settings_data_isolation_summary">Aislar almacenamiento interno: %s\nAislar almacenamiento externo: %s\nReforzar Aislamiento: %s</string>
+    <string name="settings_data_isolation_summary">Aislar almacenamiento interno: %1$s\nAislar almacenamiento externo: %2$s\nReforzar Aislamiento: %3$s</string>
     <string name="settings_data_isolation_unsupported">Esta opción solo está disponible en Android 11 y superior</string>
     <string name="settings_app_data_isolation">Aislamiento de datos de apps</string>
     <string name="settings_vold_app_data_isolation">Aislamiento de datos en almacenamiento externo</string>

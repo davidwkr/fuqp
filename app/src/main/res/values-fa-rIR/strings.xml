@@ -162,7 +162,7 @@
     <string name="settings_overwrite_summary">اگر سوئیچ‌ها علامت زده شوند موارد این دسته به صورت اجباری فعال می‌شوند</string>
     <string name="settings_default_value">مقدار پیشفرض: %s</string>
     <string name="settings_data_isolation">ایزوله‌سازی داده‌ها</string>
-    <string name="settings_data_isolation_summary">داده‌های برنامه: %s\nداده‌های برنامه Vold: %s\nمونت اجباری: %s</string>
+    <string name="settings_data_isolation_summary">داده‌های برنامه: %1$s\nداده‌های برنامه Vold: %2$s\nمونت اجباری: %3$s</string>
     <string name="settings_data_isolation_unsupported">این قابلیت فقط در اندروید 11 و بالاتر در دسترس است</string>
     <string name="settings_app_data_isolation">ایزوله‌سازی داده‌های برنامه</string>
     <string name="settings_vold_app_data_isolation">ایزوله‌سازی داده‌های برنامه Vold</string>

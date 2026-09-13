@@ -162,7 +162,7 @@
     <string name="settings_overwrite_summary">Anahtarlar açıldığında ilgili ayar zorla etkin kılınacak</string>
     <string name="settings_default_value">Varsayılan değer: %s</string>
     <string name="settings_data_isolation">Veri izolasyonu</string>
-    <string name="settings_data_isolation_summary">Uygulama verisi: %s\nVold uygulama verisi: %s\nZorla bağla: %s</string>
+    <string name="settings_data_isolation_summary">Uygulama verisi: %1$s\nVold uygulama verisi: %2$s\nZorla bağla: %3$s</string>
     <string name="settings_data_isolation_unsupported">Bu seçenek yalnızca Android 11 ve üstünde kullanılabilir</string>
     <string name="settings_app_data_isolation">Uygulama verisi izolasyonu</string>
     <string name="settings_vold_app_data_isolation">Vold uygulama verisi izolasyonu</string>

@@ -50,3 +50,7 @@ You can contribute translation [here](https://crowdin.com/project/frknkrc44-hma-
 
 ## Update log
 [Reference to the commits page](https://github.com/davidwkr/fuqp/commits)
+
+## Planned features
+
+See [TODO.md](TODO.md).

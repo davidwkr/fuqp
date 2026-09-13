@@ -36,7 +36,14 @@ class BulkHooker private constructor() {
         return hooks[clazz]?.any { it.methodName == methodName } ?: false
     }
 
-    private fun addHook(clazz: String, methodName: String, paramCount: Int, impl: HookTransformer) {
+    /** True when the hook is installed; false when it is disabled or unbindable. */
+    private fun addHook(
+        clazz: String,
+        methodName: String,
+        paramCount: Int,
+        paramTypes: List<Class<*>>?,
+        impl: HookTransformer,
+    ): Boolean {
         val inDisabledHooks = service?.config?.disabledHooks?.any {
             clazz == it.className &&
                     methodName == it.methodName &&
@@ -45,28 +52,32 @@ class BulkHooker private constructor() {
 
         if (inDisabledHooks == true) {
             logI(ZygoteEntry.TAG) { "Disabled hook: $clazz -> $methodName($paramCount)" }
-            return
+            return false
         }
 
         val element = HookElement(
             impl = impl,
             methodName = methodName,
             paramCount = paramCount,
+            paramTypes = paramTypes,
         )
 
         if (applyHook(clazz, element)) {
             hooks.computeIfAbsent(clazz) { CopyOnWriteArrayList() }.add(element)
-        } else {
-            logI(ZygoteEntry.TAG) { "Invalid hook removed: $clazz -> $methodName($paramCount)" }
+            return true
         }
+
+        logI(ZygoteEntry.TAG) { "Invalid hook removed: $clazz -> $methodName($paramCount)" }
+        return false
     }
 
     internal fun hookBefore(
         clazz: String,
         methodName: String,
         paramCount: Int = PARAMETER_COUNT_UNKNOWN,
+        paramTypes: List<Class<*>>? = null,
         hook: (methodName: String, frame: EmulatedStackFrame, returnValue: ReturnValue) -> Unit,
-    ) = addHook(clazz, methodName, paramCount) { original, frame ->
+    ) = addHook(clazz, methodName, paramCount, paramTypes) { original, frame ->
         val value = ReturnValue()
 
         try {
@@ -99,8 +110,9 @@ class BulkHooker private constructor() {
         clazz: String,
         methodName: String,
         paramCount: Int = PARAMETER_COUNT_UNKNOWN,
+        paramTypes: List<Class<*>>? = null,
         hook: (methodName: String, frame: EmulatedStackFrame, returnValue: ReturnValue) -> Unit,
-    ) = addHook(clazz, methodName, paramCount) { original, frame ->
+    ) = addHook(clazz, methodName, paramCount, paramTypes) { original, frame ->
         val value = ReturnValue()
 
         try {
@@ -145,6 +157,12 @@ class BulkHooker private constructor() {
         fun applyForClass(clazz: Class<*>?) {
             val executables = Reflection.getHiddenExecutables(clazz).filter { executable ->
                 if (element.methodName == executable.name) {
+                    // The exact list when there is one, because arity can name
+                    // more than one method; arity otherwise.
+                    element.paramTypes?.let {
+                        return@filter it == executable.parameterTypes.toList()
+                    }
+
                     if (element.paramCount >= 0) {
                         return@filter element.paramCount == executable.parameterCount
                     }
@@ -223,17 +241,22 @@ class BulkHooker private constructor() {
     private fun findHookElement(clazz: String, methodName: String) =
         hooks[clazz]?.firstOrNull { it.methodName == methodName }
 
-    fun findParamCount(
+    /**
+     * The overload whose parameter list [matches], searched up the superclass
+     * chain. Selecting by shape rather than by arity is what keeps a hook
+     * working across releases that add or retype a parameter.
+     */
+    fun findExecutable(
         clazz: String,
         methodName: String,
         loader: ClassLoader? = SystemServerHook.classLoader,
         matches: (List<Class<*>>) -> Boolean,
-    ): Int {
+    ): Executable? {
         var curClazz: Class<*>? = try {
             Class.forName(clazz, true, loader)
         } catch (ex: ClassNotFoundException) {
             logE(ZygoteEntry.TAG, ex) { "Class $clazz not found" }
-            return PARAMETER_COUNT_UNKNOWN
+            return null
         }
 
         while (curClazz != null) {
@@ -243,7 +266,7 @@ class BulkHooker private constructor() {
 
             if (found != null) {
                 logD(ZygoteEntry.TAG) { "Selected overload: $found" }
-                return found.parameterCount
+                return found
             }
 
             curClazz = curClazz.superclass
@@ -251,8 +274,16 @@ class BulkHooker private constructor() {
 
         logI(ZygoteEntry.TAG) { "No matching overload: $clazz -> $methodName" }
 
-        return PARAMETER_COUNT_UNKNOWN
+        return null
     }
+
+    fun findParamCount(
+        clazz: String,
+        methodName: String,
+        loader: ClassLoader? = SystemServerHook.classLoader,
+        matches: (List<Class<*>>) -> Boolean,
+    ) = findExecutable(clazz, methodName, loader, matches)?.parameterCount
+        ?: PARAMETER_COUNT_UNKNOWN
 
     fun findAltMethod(
         clazzNames: List<String>,

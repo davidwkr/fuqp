@@ -162,7 +162,7 @@
     <string name="settings_overwrite_summary">Elementele din această categorie vor fi forțate ca activate dacă schimbările sunt verificate</string>
     <string name="settings_default_value">Valoare implicită: %s</string>
     <string name="settings_data_isolation">Izolare date</string>
-    <string name="settings_data_isolation_summary">Datele aplicației: %s\nDatele Vold ale aplicației: Valoarea %s\nForțare montare: %s</string>
+    <string name="settings_data_isolation_summary">Datele aplicației: %1$s\nDatele Vold ale aplicației: Valoarea %2$s\nForțare montare: %3$s</string>
     <string name="settings_data_isolation_unsupported">Această opțiune este disponibilă doar de la Android 11 în sus</string>
     <string name="settings_app_data_isolation">Izolare date aplicație</string>
     <string name="settings_vold_app_data_isolation">Izolarea datelor Vold ale aplicației </string>

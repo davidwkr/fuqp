@@ -165,9 +165,9 @@
     <string name="settings_overwrite_summary">รายการในหมวดหมู่นี้จะถูกบังคับให้เปิดใช้งานหากสวิตช์ถูกเลือก</string>
     <string name="settings_default_value">ค่าเริ่มต้น: %s</string>
     <string name="settings_data_isolation">การแยกข้อมูล</string>
-    <string name="settings_data_isolation_summary">ข้อมูลแอป: %s
-Vold ข้อมูลแอป: %s
-บังคับเมานต์: %s</string>
+    <string name="settings_data_isolation_summary">ข้อมูลแอป: %1$s
+Vold ข้อมูลแอป: %2$s
+บังคับเมานต์: %3$s</string>
     <string name="settings_data_isolation_unsupported">ตัวเลือกนี้รองรับเฉพาะ Android 11 ขึ้นไปเท่านั้น</string>
     <string name="settings_app_data_isolation">แยกข้อมูลแอป</string>
     <string name="settings_vold_app_data_isolation">การแยกข้อมูลแอปด้วย Vold</string>

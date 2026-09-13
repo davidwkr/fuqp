@@ -8,7 +8,6 @@ import android.os.Binder
 import android.os.Build
 import com.v7878.unsafe.Reflection.getDeclaredField
 import com.v7878.unsafe.invoke.EmulatedStackFrame
-import com.iodvd.fuqp.common.CollectionUtils.firstWithType
 import com.iodvd.fuqp.common.Constants
 import com.iodvd.fuqp.common.OSUtils
 import com.iodvd.fuqp.common.Utils.getPackageName
@@ -109,7 +108,10 @@ class ActivityHook : IFrameworkHook {
                         return@hookBefore
                     }
 
-                    val callingUid = frame.args.firstWithType<Int>()
+                    val callingUid = frame.getArgument(APRF_FILTER_CALLING_UID) as? Int ?: run {
+                        if (DIAG) logD(TAG) { "@$methodName: exit, unexpected signature" }
+                        return@hookBefore
+                    }
                     if (callingUid == Constants.UID_SYSTEM) {
                         if (DIAG) logD(TAG) { "@$methodName: exit, system uid" }
                         return@hookBefore
