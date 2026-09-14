@@ -90,6 +90,29 @@ object Constants {
         "SHARED_USER_GID" to SHARED_USER_GID,
     )
 
+    /**
+     * Packages the framework loads into a calling app's own process while that process is
+     * still starting up, by resolving an exact package name.
+     *
+     * GrapheneOS-derived ROMs (GrapheneOS, VoltageOS, ...) patch `GmsCompat.maybeEnable()`
+     * into `Instrumentation.newApplication()`. It calls `GmsCompatLib.init()`, which does
+     * `createPackageContext("app.grapheneos.gmscompat.lib")`. That runs before any app code,
+     * under the app's own uid, so a scoped app cannot be distinguished from the framework
+     * loading the shim on its behalf - they are the same query from the same caller. Hiding
+     * the shim therefore kills every GMS-using app with
+     * `NameNotFoundException` -> `IllegalStateException` before it can start.
+     *
+     * These stay resolvable when asked for by exact name, but are still stripped from package
+     * listings, so enumerating installed packages does not reveal them. That defeats discovery
+     * by listing; it cannot defeat a probe that already hardcodes the name, because such a
+     * probe is indistinguishable from the load.
+     *
+     * Use [packagesShouldNotHide] instead for packages that must never be hidden at all.
+     */
+    val packagesVisibleOnExactName = setOf(
+        "app.grapheneos.gmscompat.lib",
+    )
+
     val packagesShouldNotHide = setOf(
         "android",
         "android.media",

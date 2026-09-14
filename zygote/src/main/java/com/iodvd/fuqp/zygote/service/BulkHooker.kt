@@ -106,6 +106,59 @@ class BulkHooker private constructor() {
         }
     }
 
+    /**
+     * [hookBefore] plus a guaranteed teardown: [after] runs once the original has returned or
+     * thrown, on the same thread that ran [hook].
+     *
+     * Registering a [hookBefore] and a [hookAfter] on one method would mean two transformers on
+     * the same target, so this is the only way to bracket a single invocation. That makes it
+     * safe to park per-call state in a ThreadLocal from [hook] - binder threads are pooled, so
+     * state that outlived its call would be read by an unrelated later query on the same thread.
+     */
+    internal fun hookAround(
+        clazz: String,
+        methodName: String,
+        paramCount: Int = PARAMETER_COUNT_UNKNOWN,
+        paramTypes: List<Class<*>>? = null,
+        after: () -> Unit,
+        hook: (methodName: String, frame: EmulatedStackFrame, returnValue: ReturnValue) -> Unit,
+    ) = addHook(clazz, methodName, paramCount, paramTypes) { original, frame ->
+        val value = ReturnValue()
+
+        try {
+            hook(methodName, frame, value)
+        } catch (it: Throwable) {
+            logE(ZygoteEntry.TAG, it) { it.message ?: "Unknown error on hook" }
+        }
+
+        try {
+            if (!value.replace) {
+                try {
+                    invokeExactCompat(clazz, methodName, original, frame, value)
+                } catch (it: Throwable) {
+                    logD(ZygoteEntry.TAG, it) { it.message ?: "Unknown error on original function" }
+                    value.throwable = it
+                }
+            }
+        } finally {
+            try {
+                after()
+            } catch (it: Throwable) {
+                logE(ZygoteEntry.TAG, it) { it.message ?: "Unknown error on hook teardown" }
+            }
+        }
+
+        value.throwable?.let {
+            ServiceUtils.clearStackTraces(it)
+
+            throw it
+        }
+
+        if (value.replace) {
+            frame.setReturnValue(value.result)
+        }
+    }
+
     internal fun hookAfter(
         clazz: String,
         methodName: String,

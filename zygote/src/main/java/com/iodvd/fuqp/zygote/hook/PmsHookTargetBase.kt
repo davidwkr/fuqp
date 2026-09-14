@@ -193,9 +193,10 @@ abstract class PmsHookTargetBase : IFrameworkHook {
                     )
                 }
 
-                hookBefore(
+                hookAround(
                     COMPUTER_ENGINE_CLASS,
                     "getApplicationInfoInternal",
+                    after = { ExactNameLookup.end() },
                 ) { methodName, frame, returnValue ->
                     applyPackageHiding(
                         methodName,
@@ -203,6 +204,7 @@ abstract class PmsHookTargetBase : IFrameworkHook {
                         { frame.args.firstOrNullWithType() },
                         ::getCallingApps,
                         { returnValue.result = null },
+                        exactNameLookup = true,
                     )
                 }
 
@@ -472,10 +474,32 @@ abstract class PmsHookTargetBase : IFrameworkHook {
         findTargetApp: () -> String?,
         findCallingApps: (Int) -> Array<String>?,
         applyReturnValue: () -> Unit,
+        /**
+         * True where the hooked method answers a lookup for one exact package name, as opposed
+         * to producing a listing or serving both. Those sites exempt
+         * [Constants.packagesVisibleOnExactName] and open an [ExactNameLookup] window so the
+         * shared visibility gate nested inside the same call exempts it too; every other site
+         * keeps filtering, which is what keeps the package out of listings.
+         *
+         * Callers passing true must register with `hookAround` so the window is torn down.
+         */
+        exactNameLookup: Boolean = false,
     ) {
         val callingUid = findCallingUid()
         if (callingUid == null || callingUid == Constants.UID_SYSTEM) return
         val targetApp = findTargetApp() ?: return
+
+        // Ahead of the uid cache on purpose: a listing hook may already have recorded this
+        // package as hidden for this uid, and that must not stop the framework from loading
+        // it into the caller's own process.
+        if (targetApp in Constants.packagesVisibleOnExactName) {
+            if (exactNameLookup) {
+                ExactNameLookup.begin(targetApp)
+                return
+            }
+            if (ExactNameLookup.isActiveFor(targetApp)) return
+        }
+
         logV(TAG) { "@$methodName incoming query: $callingUid => $targetApp" }
         if (FUQPServiceCache.instance.shouldHideFromUid(callingUid, targetApp) == true) {
             applyReturnValue()

@@ -85,9 +85,10 @@ class PmsHookTarget31 : PmsHookTargetBase() {
                 )
             }
 
-            hookBefore(
+            hookAround(
                 PMS_COMPUTER_TRACKER_CLASS,
                 "getApplicationInfoInternal",
+                after = { ExactNameLookup.end() },
             ) { methodName, frame, returnValue ->
                 applyPackageHiding(
                     methodName,
@@ -95,6 +96,7 @@ class PmsHookTarget31 : PmsHookTargetBase() {
                     { frame.getArgument(1) as String? },
                     ::getCallingApps,
                     { returnValue.result = null },
+                    exactNameLookup = true,
                 )
             }
 
