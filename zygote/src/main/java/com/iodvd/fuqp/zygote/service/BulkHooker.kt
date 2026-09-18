@@ -63,7 +63,14 @@ class BulkHooker private constructor() {
         )
 
         if (applyHook(clazz, element)) {
-            hooks.computeIfAbsent(clazz) { CopyOnWriteArrayList() }.add(element)
+            // Deliberately not computeIfAbsent: it holds the bin lock across the mapping
+            // function and is documented as non-reentrant. applyHook above has already armed
+            // the hook, so by this point a hooked method can fire on another thread and reach
+            // this same map. putIfAbsent takes no user code under the lock, so that cannot
+            // wedge the bin; the loser of a race just drops its unused list.
+            val existing = hooks[clazz]
+                ?: CopyOnWriteArrayList<HookElement>().let { hooks.putIfAbsent(clazz, it) ?: it }
+            existing.add(element)
             return true
         }
 
