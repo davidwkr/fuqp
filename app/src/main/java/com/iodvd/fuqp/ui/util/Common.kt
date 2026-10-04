@@ -3,6 +3,7 @@ package com.iodvd.fuqp.ui.util
 import android.content.ComponentName
 import android.content.pm.ActivityInfo
 import android.content.res.Resources
+import android.util.TypedValue
 import kotlinx.coroutines.flow.MutableSharedFlow
 import com.iodvd.fuqp.BuildConfig
 import com.iodvd.fuqp.R
@@ -18,7 +19,12 @@ fun ActivityInfo.asComponentName() = ComponentName(packageName, name)
 
 fun <T> MutableSharedFlow<T>.get() = replayCache.first()
 
-fun dp2Px(res: Resources, dp: Int) = res.displayMetrics.density * dp
+inline val Int.dpToPx: Float
+    get() = TypedValue.applyDimension(
+        TypedValue.COMPLEX_UNIT_DIP,
+        this.toFloat(),
+        Resources.getSystem().displayMetrics
+    )
 
 val isTestBuild get() = BuildConfig.VERSION_NAME.let { name ->
     name.count { it == '-' } != 1 ||

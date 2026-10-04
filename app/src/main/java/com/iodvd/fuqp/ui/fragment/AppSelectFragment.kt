@@ -4,7 +4,6 @@ import android.os.Bundle
 import android.view.MenuItem
 import android.view.View
 import android.widget.TextView
-import androidx.activity.addCallback
 import androidx.appcompat.widget.SearchView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.flowWithLifecycle
@@ -17,6 +16,7 @@ import com.iodvd.fuqp.ui.adapter.AppSelectAdapter
 import com.iodvd.fuqp.ui.util.ThemeUtils.homeItemBackgroundColor
 import com.iodvd.fuqp.ui.util.ThemeUtils.themeColor
 import com.iodvd.fuqp.ui.util.navController
+import com.iodvd.fuqp.ui.util.registerOnBackCallback
 import com.iodvd.fuqp.ui.util.setEdge2EdgeFlags
 import com.iodvd.fuqp.ui.util.setupToolbar
 import com.iodvd.fuqp.util.PackageHelper
@@ -87,7 +87,8 @@ abstract class AppSelectFragment : Fragment(R.layout.fragment_app_select) {
     open fun getFragmentTitle() = getString(R.string.title_app_select)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { onBack() }
+        registerOnBackCallback { onBack() }
+
         setupToolbar(
             toolbar = binding.toolbar,
             title = getFragmentTitle(),

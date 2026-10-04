@@ -26,7 +26,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-
 class LogsFragment(
     private val loadingIndicator: View,
     private val toolbar: Toolbar,
@@ -85,6 +84,7 @@ class LogsFragment(
                             }
                             cur.clear()
                         }
+                        if (cur.isNotEmpty()) cur.append('\n')
                         cur.append(line)
                     }
                     if (cur.isNotEmpty()) {

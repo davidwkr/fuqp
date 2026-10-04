@@ -2,25 +2,35 @@ package com.iodvd.fuqp.ui.fragment
 
 import android.content.Intent
 import android.content.res.ColorStateList
+import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.LayerDrawable
 import android.os.Bundle
+import android.os.SystemClock.elapsedRealtime
+import android.view.Gravity
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.widget.Chronometer
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.annotation.DrawableRes
 import androidx.core.net.toUri
 import androidx.core.view.isVisible
+import androidx.core.widget.TextViewCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.androidbroadcast.vbpd.viewBinding
 import com.iodvd.fuqp.MyApp.Companion.fuqpApp
-import com.iodvd.fuqp.common.Constants
-import com.iodvd.fuqp.common.Utils.conflictedModules
-import com.iodvd.fuqp.common.Utils.isAppInstalled
+import com.iodvd.fuqp.common.Constants.ENABLE_INTERNET_OFF
+import com.iodvd.fuqp.common.Constants.ENABLE_INTERNET_ON
+import com.iodvd.fuqp.common.Constants.ENABLE_INTERNET_UNKNOWN
+import com.iodvd.fuqp.common.Constants.MANAGER_WORK_MODE_CRASHED
+import com.iodvd.fuqp.common.Constants.MANAGER_WORK_MODE_LOADING
+import com.iodvd.fuqp.common.Constants.MANAGER_WORK_MODE_NO_HOOKS
+import com.iodvd.fuqp.common.Constants.MANAGER_WORK_MODE_UNKNOWN
 import com.iodvd.fuqp.data.fetchLatestUpdate
 import com.iodvd.fuqp.service.PrefManager
 import com.iodvd.fuqp.service.ServiceClient
@@ -28,7 +38,7 @@ import com.iodvd.fuqp.ui.util.ThemeUtils.attrDrawable
 import com.iodvd.fuqp.ui.util.ThemeUtils.getColor
 import com.iodvd.fuqp.ui.util.ThemeUtils.homeItemBackgroundColor
 import com.iodvd.fuqp.ui.util.ThemeUtils.themeColor
-import com.iodvd.fuqp.ui.util.dp2Px
+import com.iodvd.fuqp.ui.util.dpToPx
 import com.iodvd.fuqp.ui.util.isTestBuild
 import com.iodvd.fuqp.ui.util.navigate
 import com.iodvd.fuqp.ui.util.setEdge2EdgeFlags
@@ -55,11 +65,39 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             setupToolbar(
                 toolbar = this,
                 title = getString(R.string.app_name),
-                isHomeToolbar = true,
                 menuRes = R.menu.menu_home,
                 onMenuOptionSelected = ::onMenuOptionSelected,
             )
             // isTitleCentered = true
+
+            setOnLongClickListener {
+                val dialog = MaterialAlertDialogBuilder(context)
+                    .setTitle(R.string.app_name)
+                    .create()
+
+                dialog.setView(Chronometer(context).apply {
+                    layoutParams = ViewGroup.LayoutParams(-1, -2)
+                    base = elapsedRealtime() + 3000
+                    textSize = 24.dpToPx
+                    gravity = Gravity.CENTER
+                    typeface = Typeface.SERIF
+                    onChronometerTickListener = {
+                        if (elapsedRealtime() >= base) {
+                            stop()
+                            dialog.dismiss()
+
+                            // is it really final countdown?
+                            isTheFinalCountDown
+                        }
+                    }
+                    isCountDown = true
+                    start()
+                })
+
+                dialog.show()
+
+                true
+            }
         }
 
         setEdge2EdgeFlags(binding.root)
@@ -73,9 +111,9 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         with(binding.howToUse.root.parent as ViewGroup) {
             val childCount = childCount
 
-            val softCorner: Float = dp2Px(resources, 24)
-            val squareCorner: Float = dp2Px(resources, 8)
-            val pad = dp2Px(resources, 16).toInt()
+            val softCorner = 24.dpToPx
+            val squareCorner = 8.dpToPx
+            val pad = 16.dpToPx.toInt()
 
             for (i in 0..< childCount) {
                 getChildAt(i).apply {
@@ -97,45 +135,39 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
 
                     when (i) {
                         0 -> {
-                            backgroundDrawable.setCornerRadii(
-                                floatArrayOf(
-                                    softCorner,
-                                    softCorner,
-                                    softCorner,
-                                    softCorner,
-                                    squareCorner,
-                                    squareCorner,
-                                    squareCorner,
-                                    squareCorner
-                                )
+                            backgroundDrawable.cornerRadii = floatArrayOf(
+                                softCorner,
+                                softCorner,
+                                softCorner,
+                                softCorner,
+                                squareCorner,
+                                squareCorner,
+                                squareCorner,
+                                squareCorner
                             )
                         }
                         childCount - 1 -> {
-                            backgroundDrawable.setCornerRadii(
-                                floatArrayOf(
-                                    squareCorner,
-                                    squareCorner,
-                                    squareCorner,
-                                    squareCorner,
-                                    softCorner,
-                                    softCorner,
-                                    softCorner,
-                                    softCorner
-                                )
+                            backgroundDrawable.cornerRadii = floatArrayOf(
+                                squareCorner,
+                                squareCorner,
+                                squareCorner,
+                                squareCorner,
+                                softCorner,
+                                softCorner,
+                                softCorner,
+                                softCorner
                             )
                         }
                         else -> {
-                            backgroundDrawable.setCornerRadii(
-                                floatArrayOf(
-                                    squareCorner,
-                                    squareCorner,
-                                    squareCorner,
-                                    squareCorner,
-                                    squareCorner,
-                                    squareCorner,
-                                    squareCorner,
-                                    squareCorner
-                                )
+                            backgroundDrawable.cornerRadii = floatArrayOf(
+                                squareCorner,
+                                squareCorner,
+                                squareCorner,
+                                squareCorner,
+                                squareCorner,
+                                squareCorner,
+                                squareCorner,
+                                squareCorner
                             )
                         }
                     }
@@ -281,9 +313,15 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     fun loadEnabledIndicator(serviceVersion: Int, workMode: Int) {
         fuqpApp.loadConfiguration()
 
+        val isWorking = serviceVersion > 0 && workMode != MANAGER_WORK_MODE_UNKNOWN
+        val isCrashed = workMode == MANAGER_WORK_MODE_CRASHED
+        val isNoHooks = isCrashed || workMode == MANAGER_WORK_MODE_NO_HOOKS
+        val isVersionMismatch = ServiceClient.serviceVersionName != BuildConfig.VERSION_NAME
+
         var color = when {
-            serviceVersion == 0 || workMode == Constants.MANAGER_WORK_MODE_UNKNOWN -> getColor(R.color.invalid)
-            workMode == Constants.MANAGER_WORK_MODE_NO_HOOKS -> getColor(R.color.md_theme_material_amber_light_error)
+            !isWorking -> getColor(R.color.invalid)
+            isNoHooks -> getColor(R.color.md_theme_material_amber_light_error)
+            isVersionMismatch -> themeColor(android.R.attr.colorError)
             else -> themeColor(android.R.attr.colorPrimary)
         }
 
@@ -293,74 +331,37 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
 
         with(binding.statusCard) {
             root.setCardBackgroundColor(color)
-            root.outlineAmbientShadowColor = color
-            root.outlineSpotShadowColor = color
 
-            if (serviceVersion > 0) {
-                if (workMode == Constants.MANAGER_WORK_MODE_NO_HOOKS) {
+            if (isWorking) {
+                if (isNoHooks) {
                     val colorError = ColorStateList.valueOf(
                         getColor(R.color.md_theme_material_amber_dark_error))
-                    moduleStatusIcon.imageTintList = colorError
-                    moduleStatusIcon.setImageResource(R.drawable.sick_24px)
 
                     moduleStatus.setText(R.string.sick_mode_title)
                     moduleStatus.setTextColor(colorError)
+                    setStatusIcon(R.drawable.sick_24px)
                     serviceStatus.setText(R.string.sick_mode_description)
                     serviceStatus.setTextColor(colorError)
-                    filterCount.setText(R.string.sick_mode_notice)
-                    filterCount.setTextColor(colorError)
+                    filterCount.isVisible = false
 
-                    migrateBtn.isVisible = true
+                    migrateBtn.isVisible = !isCrashed
                     @Suppress("DEPRECATION")
                     migrateBtn.setOnClickListener {
-                        MaterialAlertDialogBuilder(requireContext())
-                            .setTitle(R.string.home_migrate_data)
-                            .setMessage(R.string.home_migrate_data_summary)
-                            .setPositiveButton(R.string.yes) { _, _ ->
-                                val packages = findUninstallRequiredPackages()
-                                if (packages.size > 1) {
-                                    showMigrateStatusDialog(false)
-                                    return@setPositiveButton
-                                }
-
-                                if (packages.isNotEmpty() && !ServiceClient.migrateData(packages.first())) {
-                                    showMigrateStatusDialog(false)
-                                    return@setPositiveButton
-                                }
-
-                                startActivity(Intent(Intent.ACTION_UNINSTALL_PACKAGE).apply {
-                                    data = "package:${packages.first()}".toUri()
-                                })
-
-                                showMigrateStatusDialog(true)
-                            }
-                            .setNegativeButton(android.R.string.cancel, null)
-                            .setNeutralButton(R.string.home_migrate_uninstall_only) { _, _ ->
-                                val packages = findUninstallRequiredPackages()
-                                if (packages.size > 1) {
-                                    showMigrateStatusDialog(false)
-                                    return@setNeutralButton
-                                }
-
-                                if (packages.isNotEmpty()) {
-                                    startActivity(Intent(Intent.ACTION_UNINSTALL_PACKAGE).apply {
-                                        data = "package:${packages.first()}".toUri()
-                                    })
-                                }
-
-                                showMigrateStatusDialog(true)
-                            }
-                            .show()
+                        navigate(R.id.nav_fix_issue)
                     }
                 } else {
-                    val image = when(workMode) {
-                        Constants.MANAGER_WORK_MODE_LOADING -> R.drawable.sentiment_stressed_24px
+                    val image = when {
+                        isVersionMismatch -> R.drawable.sentiment_worried_24px
+                        workMode == MANAGER_WORK_MODE_LOADING -> R.drawable.sentiment_stressed_24px
                         else -> R.drawable.sentiment_calm_24px
                     }
+                    setStatusIcon(image)
 
-                    moduleStatusIcon.setImageResource(image)
-
-                    val versionNameSimple = ServiceClient.serviceVersionName ?: BuildConfig.VERSION_NAME
+                    val versionNameSimple = if (isVersionMismatch) {
+                        "${ServiceClient.serviceVersionName} - ${BuildConfig.VERSION_NAME}"
+                    } else {
+                        ServiceClient.serviceVersionName
+                    }
                     moduleStatus.text =
                         getString(R.string.home_xposed_activated, versionNameSimple)
                     root.setOnLongClickListener {
@@ -377,18 +378,34 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                         getString(R.string.home_xposed_filter_count, ServiceClient.filterCount)
                 }
             } else {
-                val colorError = getColor(android.R.color.black)
-                moduleStatusIcon.imageTintList = ColorStateList.valueOf(colorError)
-                moduleStatusIcon.setImageResource(R.drawable.sentiment_very_dissatisfied_24px)
+                setStatusIcon(R.drawable.sentiment_very_dissatisfied_24px)
                 moduleStatus.setText(R.string.home_xposed_not_activated)
                 serviceStatus.setText(R.string.home_xposed_service_off)
-                filterCount.visibility = View.GONE
+                filterCount.isVisible = false
             }
+
+            TextViewCompat.setCompoundDrawableTintList(
+                moduleStatus, moduleStatus.textColors)
         }
+
+        val isHooks = !isNoHooks && isWorking
+
+        binding.manageApps.root.isVisible = isHooks
+        binding.manageTemplates.root.isVisible = isHooks
+        binding.managePresets.root.isVisible = isHooks
+        binding.navBulkConfigWizard.root.isVisible = isHooks
+        binding.navLogs.root.isVisible = isWorking
+        binding.navSettings.root.isVisible = isWorking
+        (binding.backupConfig.parent as ViewGroup).isVisible = isHooks
+    }
+
+    private fun setStatusIcon(@DrawableRes res: Int) {
+        binding.statusCard.moduleStatus
+            .setCompoundDrawablesRelativeWithIntrinsicBounds(res, 0, 0, 0)
     }
 
     private fun loadDialogs() {
-        if (PrefManager.enableInternet == Constants.ENABLE_INTERNET_UNKNOWN) {
+        if (PrefManager.enableInternet == ENABLE_INTERNET_UNKNOWN) {
             loadEnableInternetDialog()
             return
         }
@@ -402,17 +419,17 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             .setTitle(R.string.settings_enable_internet)
             .setMessage(R.string.settings_enable_internet_summary)
             .setPositiveButton(R.string.yes) { _, _ ->
-                PrefManager.enableInternet = Constants.ENABLE_INTERNET_ON
+                PrefManager.enableInternet = ENABLE_INTERNET_ON
                 loadUpdateDialog()
             }
             .setNegativeButton(R.string.no) { _, _ ->
-                PrefManager.enableInternet = Constants.ENABLE_INTERNET_OFF
+                PrefManager.enableInternet = ENABLE_INTERNET_OFF
             }
             .show()
     }
 
     private fun loadUpdateDialog() {
-        if (PrefManager.enableInternet != Constants.ENABLE_INTERNET_ON ||
+        if (PrefManager.enableInternet != ENABLE_INTERNET_ON ||
             fuqpApp.updateDialogSkipped || PrefManager.disableUpdate || isTestBuild) {
             return
         }
@@ -450,22 +467,6 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                 })
             }
         }
-    }
-
-    private fun findUninstallRequiredPackages() = conflictedModules.filter {
-        requireContext().packageManager.isAppInstalled(it)
-    }
-
-    private fun showMigrateStatusDialog(success: Boolean) {
-        MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.home_migrate_data)
-            .setMessage(if (success) {
-                R.string.home_migrate_data_completed
-            } else {
-                R.string.home_migrate_data_failed
-            })
-            .setNegativeButton(android.R.string.ok, null)
-            .show()
     }
 
     companion object {

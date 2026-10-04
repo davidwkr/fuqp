@@ -23,6 +23,7 @@ import dev.androidbroadcast.vbpd.viewBinding
 import com.iodvd.fuqp.MyApp.Companion.fuqpApp
 import com.iodvd.fuqp.common.Constants
 import com.iodvd.fuqp.common.JsonConfig
+import com.iodvd.fuqp.common.OSUtils
 import com.iodvd.fuqp.common.PropertyUtils
 import com.iodvd.fuqp.data.AppConstants
 import com.iodvd.fuqp.service.ConfigManager
@@ -34,9 +35,11 @@ import com.iodvd.fuqp.ui.util.navigate
 import com.iodvd.fuqp.ui.util.recreateMainActivity
 import com.iodvd.fuqp.ui.util.setEdge2EdgeFlags
 import com.iodvd.fuqp.ui.util.setupToolbar
+import com.iodvd.fuqp.ui.util.showNeedRebootToast
 import com.iodvd.fuqp.ui.util.showToast
 import com.iodvd.fuqp.ui.util.withAnimations
-import com.iodvd.fuqp.util.ConfigUtils.Companion.getLocale
+import com.iodvd.fuqp.ui.util.withDisableButton
+import com.iodvd.fuqp.util.ConfigUtils.getLocale
 import com.iodvd.fuqp.util.PackageHelper.findEnabledAppComponent
 import com.iodvd.fuqp.util.SuUtils
 import kotlinx.coroutines.launch
@@ -108,7 +111,6 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
                 "forceMountData" -> ConfigManager.forceMountData
                 "enableInternet" -> PrefManager.enableInternet == Constants.ENABLE_INTERNET_ON
                 "disableUpdate" -> PrefManager.disableUpdate
-                "packageQueryWorkaround" -> ConfigManager.packageQueryWorkaround
                 "webViewProtection" -> ConfigManager.webViewProtection
                 else -> throw IllegalArgumentException("Invalid key: $key")
             }
@@ -154,7 +156,6 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
                 "appDataIsolation" -> ConfigManager.altAppDataIsolation = value
                 "voldAppDataIsolation" -> ConfigManager.altVoldAppDataIsolation = value
                 "skipSystemAppDataIsolation" -> ConfigManager.skipSystemAppDataIsolation = value
-                "packageQueryWorkaround" -> ConfigManager.packageQueryWorkaround = value
                 "webViewProtection" -> ConfigManager.webViewProtection = value
                 else -> throw IllegalArgumentException("Invalid key: $key")
             }
@@ -191,14 +192,24 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
             setPreferencesFromResource(R.xml.settings_data_isolation, rootKey)
 
             findPreference<SwitchPreferenceCompat>("appDataIsolation")?.let {
+                it.isEnabled = !PropertyUtils.isAppDataIsolationEnabled
+
                 it.summary = getString(R.string.settings_need_reboot) + "\n\n" +
                         getString(
                             R.string.settings_default_value,
                             PropertyUtils.isAppDataIsolationEnabled.enabledString(resources)
                         )
+
+                it.setOnPreferenceChangeListener { _, _ ->
+                    showNeedRebootToast()
+
+                    true
+                }
             }
 
             findPreference<SwitchPreferenceCompat>("voldAppDataIsolation")?.let {
+                it.isEnabled = !PropertyUtils.isVoldAppDataIsolationEnabled
+
                 it.summary = getString(R.string.settings_need_reboot) + "\n\n" +
                         getString(
                             R.string.settings_default_value,
@@ -212,16 +223,29 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
                             .setTitle(R.string.settings_warning)
                             .setMessage(R.string.settings_vold_warning)
                             .setPositiveButton(android.R.string.ok) { _, _ ->
+                                showNeedRebootToast()
+
                                 it.isChecked = true
                             }
                             .setNegativeButton(android.R.string.cancel) { _, _ ->
                                 it.isChecked = false
                             }
                             .setCancelable(false)
+                            .create()
+                            .withDisableButton()
                             .show()
                     }
-                    !enabled
+
+                    (!enabled).apply {
+                        if (this) {
+                            showNeedRebootToast()
+                        }
+                    }
                 }
+            }
+
+            findPreference<Preference>("categoryVoldAppDataIsolation")?.let {
+                it.isVisible = !OSUtils.isSamsung()
             }
         }
     }
@@ -258,7 +282,6 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
             }
         }
 
-        @Suppress("deprecation")
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             preferenceManager.preferenceDataStore = SettingsPreferenceDataStore()
             setPreferencesFromResource(R.xml.settings, rootKey)
@@ -283,10 +306,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
                     it.summary = if (!TextUtils.isEmpty(locale.script)) locale.getDisplayScript(userLocale) else locale.getDisplayName(userLocale)
                 }
                 it.setOnPreferenceChangeListener { _, newValue ->
-                    val locale = getLocale(newValue as String)
-                    val config = resources.configuration
-                    config.setLocale(locale)
-                    fuqpApp.resources.updateConfiguration(config, resources.displayMetrics)
+                    fuqpApp.reloadLocale(getLocale(newValue as String))
                     recreateMainActivity()
                     true
                 }
@@ -445,6 +465,12 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
                     "${it.className.substringAfterLast('.')} -> ${it.methodName}($displayedArgCount)"
                 }.toTypedArray()
                 entryValues = allHooks.map { it.toString() }.toTypedArray()
+
+                setOnPreferenceChangeListener { _, _ ->
+                    showNeedRebootToast()
+
+                    true
+                }
             }
 
             findPreference<Preference>("resetDefault")?.setOnPreferenceClickListener {

@@ -6,7 +6,8 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import com.iodvd.fuqp.common.Constants
 import com.iodvd.fuqp.common.IFUQPService
-import java.io.FileInputStream
+import com.iodvd.fuqp.util.FDUtils.readFromPipe
+import com.iodvd.fuqp.util.FDUtils.writeIntoPipe
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
@@ -26,8 +27,10 @@ object ServiceClient : IFUQPService, IBinder.DeathRecipient {
 
     @Volatile
     private var service: IFUQPService? = null
+    private var provider: ServiceProvider? = null
 
-    fun linkService(binder: IBinder) {
+    fun linkService(provider: ServiceProvider, binder: IBinder) {
+        this.provider = provider
         service = Proxy.newProxyInstance(
             javaClass.classLoader,
             arrayOf(IFUQPService::class.java),
@@ -47,13 +50,9 @@ object ServiceClient : IFUQPService, IBinder.DeathRecipient {
 
     override fun getFilterCount() = service?.filterCount ?: 0
 
-    override fun getLogs(): String? {
-        val parcelFD = readFD(Constants.PARCEL_TYPE_LOG) ?: return service?.logs
-        val readStream = FileInputStream(parcelFD.fileDescriptor)
-        return readStream.readBytes().decodeToString().also {
-            readStream.close()
-            parcelFD.close()
-        }
+    val logs get(): String {
+        val descriptor = readFD(Constants.PARCEL_TYPE_LOG) ?: return ""
+        return readFromPipe(descriptor)
     }
 
     override fun clearLogs() {
@@ -67,18 +66,15 @@ object ServiceClient : IFUQPService, IBinder.DeathRecipient {
     override fun getPackagesForPreset(presetName: String) =
         service?.getPackagesForPreset(presetName)
 
-    override fun readConfig(): String? {
-        val parcelFD = service?.readFD(Constants.PARCEL_TYPE_CONFIG) ?: return service?.readConfig()
-        val readStream = FileInputStream(parcelFD.fileDescriptor)
-        return readStream.readBytes().decodeToString().also {
-            readStream.close()
-            parcelFD.close()
+    var config: String
+        get() {
+            val descriptor = service?.readFD(Constants.PARCEL_TYPE_CONFIG) ?: return "{}"
+            return readFromPipe(descriptor)
         }
-    }
-
-    override fun writeConfig(json: String) {
-        service?.writeConfig(json)
-    }
+        set(text) = writeFD(
+            Constants.PARCEL_TYPE_CONFIG,
+            writeIntoPipe(provider ?: return, text),
+        )
 
     fun forceStop(packageName: String) {
         forceStop(packageName, 0)
@@ -141,4 +137,6 @@ object ServiceClient : IFUQPService, IBinder.DeathRecipient {
         service?.reloadConfigFromFile()
         ConfigManager.init()
     }
+
+    override fun getUserProfiles() = service?.userProfiles
 }

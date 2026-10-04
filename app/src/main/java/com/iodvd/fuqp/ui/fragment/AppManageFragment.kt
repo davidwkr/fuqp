@@ -8,6 +8,7 @@ import com.iodvd.fuqp.R
 import com.iodvd.fuqp.ui.fragment.AppSettingsV2FragmentArgs
 
 class AppManageFragment : AppSelectFragment() {
+    override fun getFragmentTitle() = getString(R.string.title_app_manage)
 
     override val firstComparator: Comparator<String> = Comparator.comparing(ConfigManager::isHideEnabled).reversed()
 

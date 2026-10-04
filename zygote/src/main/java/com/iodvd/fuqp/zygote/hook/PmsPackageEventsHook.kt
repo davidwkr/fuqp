@@ -3,8 +3,6 @@ package com.iodvd.fuqp.zygote.hook
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import com.iodvd.fuqp.zygote.service.BulkHooker
-import com.iodvd.fuqp.zygote.service.FUQPService.Companion.service
 import com.iodvd.fuqp.zygote.util.Logcat.logI
 import com.iodvd.fuqp.zygote.util.ZLUtils.getArgument
 import com.iodvd.fuqp.zygote.util.ZygoteConstants.BROADCAST_HELPER_CLASS
@@ -17,7 +15,7 @@ class PmsPackageEventsHook : IFrameworkHook {
     override fun load() {
         logI(TAG) { "Load hook" }
 
-        BulkHooker.instance.apply {
+        hooker.apply {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 val hookedMethodName = "sendPackageBroadcastAndNotify"
 
@@ -25,7 +23,7 @@ class PmsPackageEventsHook : IFrameworkHook {
                     BROADCAST_HELPER_CLASS,
                     hookedMethodName,
                 ) { _, frame, _ ->
-                    service?.handlePackageEvent(
+                    service.handlePackageEvent(
                         frame.getArgument(1) as? String,
                         frame.getArgument(2) as? String,
                         frame.getArgument(3) as? Bundle,
@@ -39,7 +37,7 @@ class PmsPackageEventsHook : IFrameworkHook {
                     ) { _, frame, _ ->
                         val intent = frame.getArgument(2) as? Intent ?: return@hookBefore
 
-                        service?.handlePackageEvent(
+                        service.handlePackageEvent(
                             intent.action,
                             intent.data?.encodedSchemeSpecificPart,
                             intent.extras,
@@ -51,7 +49,7 @@ class PmsPackageEventsHook : IFrameworkHook {
                     PACKAGE_MANAGER_SERVICE_CLASS,
                     "sendPackageBroadcast",
                 ) { _, frame, _ ->
-                    service?.handlePackageEvent(
+                    service.handlePackageEvent(
                         frame.getArgument(1) as? String,
                         frame.getArgument(2) as? String,
                         frame.getArgument(3) as? Bundle,

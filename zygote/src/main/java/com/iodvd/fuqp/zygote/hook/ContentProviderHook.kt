@@ -9,8 +9,7 @@ import android.os.Bundle
 import android.provider.Settings
 import com.v7878.unsafe.invoke.EmulatedStackFrame
 import com.iodvd.fuqp.common.CollectionUtils.firstWithType
-import com.iodvd.fuqp.zygote.service.BulkHooker
-import com.iodvd.fuqp.zygote.service.FUQPService.Companion.service
+import com.iodvd.fuqp.zygote.util.ContentProviderUtils.getOverriddenDatabaseName
 import com.iodvd.fuqp.zygote.util.Logcat.logD
 import com.iodvd.fuqp.zygote.util.ServiceUtils
 import com.iodvd.fuqp.zygote.util.ZLUtils.args
@@ -25,14 +24,14 @@ class ContentProviderHook : IFrameworkHook {
 
     @Suppress("UNCHECKED_CAST")
     override fun load() {
-        BulkHooker.instance.apply {
+        hooker.apply {
             hookAfter(
                 CONTENT_PROVIDER_TRANSPORT_CLASS,
                 "query",
             ) { _, frame, returnValue ->
                 val callingApps = getCallingPackages(frame)
 
-                val caller = callingApps.firstOrNull { service?.isAnySettingsReplacementsEnabled(it) ?: false }
+                val caller = callingApps.firstOrNull { service.isAnySettingsReplacementsEnabled(it) }
                 if (caller == null) return@hookAfter
 
                 val uriIdx = frame.args.indexOfFirst { it is Uri }
@@ -43,33 +42,46 @@ class ContentProviderHook : IFrameworkHook {
                 val segments = uri.pathSegments
                 if (segments.isEmpty()) return@hookAfter
 
-                logD(TAG) {
-                    val projection = frame.args[uriIdx + 1] as Array<String>?
-                    val args = frame.args[uriIdx + 2] as Bundle?
+                val projection = frame.args[uriIdx + 1] as? Array<String>
+                val args = frame.args[uriIdx + 2] as? Bundle
 
+                logD(TAG) {
                     "@spoofSettings QUERY in ${callingApps.contentToString()}: $uri, ${projection?.contentToString()}, $args"
                 }
 
-                val database = segments[0]
+                var database = segments[0]
 
                 if (segments.size >= 2) {
                     val name = segments[1]
 
-                    logD(TAG) { "@spoofSettings QUERY received caller: $caller, database: $database, name: $name" }
+                    logD(TAG) { "@spoofSettings QUERY received caller: $caller, database: $database, name: $name, args: $args" }
 
-                    val replacement = service?.getSpoofedSetting(caller, name, database)
+                    database = getOverriddenDatabaseName(database, name)
+
+                    val replacement = service.getSpoofedSetting(caller, name, database)
                     if (replacement != null) {
-                        logD(TAG) { "@spoofSettings QUERY $name in $database replaced for $caller" }
-                        returnValue.result = MatrixCursor(arrayOf("name", "value"), 1).apply {
-                            addRow(arrayOf(replacement.name, replacement.value))
+                        val columnNames = projection ?: arrayOf("name", "value")
+                        val nameInColumns = "name" in columnNames
+                        val valueInColumns = "value" in columnNames
+
+                        val returnedArray = when {
+                            nameInColumns && valueInColumns -> arrayOf(replacement.name, replacement.value)
+                            valueInColumns -> arrayOf(replacement.value)
+                            nameInColumns -> arrayOf(replacement.name)
+                            else -> return@hookAfter
                         }
 
-                        service?.increaseSettingsFilterCount(caller)
+                        logD(TAG) { "@spoofSettings QUERY $name in $database replaced for $caller" }
+                        returnValue.result = MatrixCursor(columnNames, 1).apply {
+                            addRow(returnedArray)
+                        }
+
+                        service.increaseSettingsFilterCount(caller)
                     }
                 } else {
                     logD(TAG) { "@spoofSettings LIST_QUERY received caller: $caller, database: $database" }
 
-                    val result = returnValue.result as? Cursor? ?: return@hookAfter
+                    val result = returnValue.result as? Cursor ?: return@hookAfter
 
                     val columns = mutableMapOf<String, MutableList<String?>>().apply {
                         for (i in 0 ..< result.columnCount) {
@@ -93,7 +105,8 @@ class ContentProviderHook : IFrameworkHook {
                         val name = result.getString(columns.keys.indexOf("name"))
                         keyColumn.add(name)
 
-                        val replacement = service?.getSpoofedSetting(caller, name, database)
+                        val dbName = getOverriddenDatabaseName(database, name)
+                        val replacement = service.getSpoofedSetting(caller, name, dbName)
                         val value = if (replacement != null) {
                             logD(TAG) { "@spoofSettings QUERY $name in $database replaced for $caller" }
 
@@ -115,7 +128,7 @@ class ContentProviderHook : IFrameworkHook {
                         }
                     }
 
-                    service?.increaseSettingsFilterCount(caller, filteredEntryCount)
+                    service.increaseSettingsFilterCount(caller, filteredEntryCount)
 
                     returnValue.result = MatrixCursor(columns.keys.toTypedArray(), columns.size).apply {
                         val size = columns.values.first().size
@@ -137,19 +150,19 @@ class ContentProviderHook : IFrameworkHook {
                 "call",
             ) { _, frame, returnValue ->
                 val callingApps = getCallingPackages(frame)
-                val caller = callingApps.firstOrNull { service?.isAnySettingsReplacementsEnabled(it) ?: false }
+                val caller = callingApps.firstOrNull { service.isAnySettingsReplacementsEnabled(it) }
                 if (caller == null) return@hookBefore
 
                 val nameIdx = frame.args.indexOfLast { it is String }
-                val name = frame.args[nameIdx] as String?
-                val method = frame.args[nameIdx - 1] as String?
+                val name = frame.args[nameIdx] as? String
+                val method = frame.args[nameIdx - 1] as? String
 
                 logD(TAG) { "@spoofSettings CALL received caller: ${callingApps.contentToString()}, method: $method, name: $name" }
 
                 when (method) {
                     "GET_global", "GET_secure", "GET_system" -> {
                         val database = method.substring(method.indexOf('_') + 1)
-                        val replacement = service?.getSpoofedSetting(caller, name, database)
+                        val replacement = service.getSpoofedSetting(caller, name, database)
                         if (replacement != null) {
                             logD(TAG) { "@spoofSettings CALL $name in $database replaced for $caller" }
                             returnValue.result = Bundle().apply {
@@ -157,7 +170,7 @@ class ContentProviderHook : IFrameworkHook {
                                 putInt("_generation_index", -1)
                             }
 
-                            service?.increaseSettingsFilterCount(caller)
+                            service.increaseSettingsFilterCount(caller)
                         }
                     }
                 }
@@ -173,6 +186,6 @@ class ContentProviderHook : IFrameworkHook {
             arrayOf(frame.args.firstWithType<String>())
         }
     } catch (_: Throwable) {
-        ServiceUtils.getCallingApps()
+        ServiceUtils.getCallingApps(pms)
     }
 }

@@ -2,7 +2,6 @@ package com.iodvd.fuqp.ui.fragment
 
 import android.os.Bundle
 import android.view.View
-import androidx.activity.addCallback
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.setFragmentResult
 import androidx.navigation.fragment.navArgs
@@ -14,6 +13,7 @@ import com.iodvd.fuqp.common.Constants
 import com.iodvd.fuqp.service.ServiceClient
 import com.iodvd.fuqp.ui.util.get
 import com.iodvd.fuqp.ui.util.navController
+import com.iodvd.fuqp.ui.util.registerOnBackCallback
 import com.iodvd.fuqp.ui.util.setEdge2EdgeFlags
 import com.iodvd.fuqp.ui.util.setupToolbar
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -64,7 +64,7 @@ class EditSettingFragment : Fragment(R.layout.fragment_edit_setting) {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { onBack() }
+        registerOnBackCallback { onBack() }
 
         setupToolbar(
             toolbar = binding.toolbar,

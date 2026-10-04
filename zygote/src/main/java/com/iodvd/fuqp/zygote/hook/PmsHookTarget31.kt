@@ -3,59 +3,32 @@ package com.iodvd.fuqp.zygote.hook
 import android.os.Binder
 import android.os.Build
 import androidx.annotation.RequiresApi
-import com.iodvd.fuqp.common.Constants.VENDING_PACKAGE_NAME
-import com.iodvd.fuqp.zygote.service.BulkHooker
 import com.iodvd.fuqp.zygote.util.Logcat.logI
 import com.iodvd.fuqp.zygote.util.ServiceUtils.getCallingApps
 import com.iodvd.fuqp.zygote.util.ServiceUtils.getPackageNameFromPackageSettings
-import com.iodvd.fuqp.zygote.util.ZLUtils.findConstructor
 import com.iodvd.fuqp.zygote.util.ZLUtils.getArgument
 import com.iodvd.fuqp.zygote.util.ZygoteConstants.APPS_FILTER_CLASS
 import com.iodvd.fuqp.zygote.util.ZygoteConstants.PMS_COMPUTER_TRACKER_CLASS
 
 @RequiresApi(Build.VERSION_CODES.S)
 class PmsHookTarget31 : PmsHookTargetBase() {
-
     override val TAG = "PmsHookTarget31"
-
-    override val fakeSystemPackageInstallSourceInfo: Any by lazy {
-        findConstructor(
-            "android.content.pm.InstallSourceInfo",
-            4,
-        )!!.newInstance(
-            null,
-            null,
-            null,
-            null,
-        )
-    }
-
-    override val fakeUserPackageInstallSourceInfo: Any by lazy {
-        findConstructor(
-            "android.content.pm.InstallSourceInfo",
-            4,
-        )!!.newInstance(
-            VENDING_PACKAGE_NAME,
-            psPackageInfo?.signingInfo,
-            VENDING_PACKAGE_NAME,
-            VENDING_PACKAGE_NAME,
-        )
-    }
 
     override fun load() {
         logI(TAG) { "Load hook" }
 
-        BulkHooker.instance.apply {
+        hooker.apply {
             hookBefore(
                 PMS_COMPUTER_TRACKER_CLASS,
                 "getPackageSetting",
             ) { methodName, frame, returnValue ->
                 applyPackageHiding(
                     methodName,
+                    returnValue,
                     { Binder.getCallingUid() },
-                    { frame.getArgument(1) as String? },
+                    { frame.getArgument(1) as? String },
                     ::getCallingApps,
-                    { returnValue.result = null },
+                    null,
                 )
             }
 
@@ -65,40 +38,50 @@ class PmsHookTarget31 : PmsHookTargetBase() {
             ) { methodName, frame, returnValue ->
                 applyPackageHiding(
                     methodName,
-                    { frame.getArgument(2) as Int? },
-                    { frame.getArgument(1) as String? },
+                    returnValue,
+                    { frame.getArgument(2) as? Int },
+                    { frame.getArgument(1) as? String },
                     ::getCallingApps,
-                    { returnValue.result = null },
+                    null,
                 )
             }
 
-            hookBefore(
+            hookAfter(
                 PMS_COMPUTER_TRACKER_CLASS,
                 "getPackageInfoInternal",
             ) { methodName, frame, returnValue ->
                 applyPackageHiding(
                     methodName,
-                    { frame.getArgument(4) as Int? },
-                    { frame.getArgument(1) as String? },
+                    returnValue,
+                    { frame.getArgument(4) as? Int },
+                    { frame.getArgument(1) as? String },
                     ::getCallingApps,
-                    { returnValue.result = null },
+                    null,
                 )
             }
 
+            // The single exact-name opener on this API level. createPackageContext resolves
+            // through here, and the shared gate it reaches only exempts packagesVisibleOnExactName
+            // while this call's window is open. See ExactNameLookup.
             hookAround(
                 PMS_COMPUTER_TRACKER_CLASS,
                 "getApplicationInfoInternal",
-                after = { ExactNameLookup.end() },
-            ) { methodName, frame, returnValue ->
-                applyPackageHiding(
-                    methodName,
-                    { frame.getArgument(3) as Int? },
-                    { frame.getArgument(1) as String? },
-                    ::getCallingApps,
-                    { returnValue.result = null },
-                    exactNameLookup = true,
-                )
-            }
+                before = { _, frame ->
+                    ExactNameLookup.beginIfVisibleOnExactName(frame.getArgument(1) as? String)
+                },
+                after = { methodName, frame, returnValue ->
+                    ExactNameLookup.end()
+                    applyPackageHiding(
+                        methodName,
+                        returnValue,
+                        { frame.getArgument(3) as? Int },
+                        { frame.getArgument(1) as? String },
+                        ::getCallingApps,
+                        null,
+                        exactNameLookup = true,
+                    )
+                },
+            )
 
             hookBefore(
                 APPS_FILTER_CLASS,
@@ -106,14 +89,13 @@ class PmsHookTarget31 : PmsHookTargetBase() {
             ) { methodName, frame, returnValue ->
                 applyPackageHiding(
                     methodName,
-                    { frame.getArgument(1) as Int? },
+                    returnValue,
+                    { frame.getArgument(1) as? Int },
                     { getPackageNameFromPackageSettings(frame.getArgument(3)) },
                     ::getCallingApps,
-                    { returnValue.result = true },
+                    true,
                 )
             }
         }
-
-        super.load()
     }
 }

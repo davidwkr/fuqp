@@ -2,7 +2,6 @@ package com.iodvd.fuqp.ui.fragment
 
 import android.os.Bundle
 import android.view.View
-import androidx.activity.addCallback
 import androidx.core.view.isVisible
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
@@ -19,6 +18,7 @@ import com.iodvd.fuqp.service.ConfigManager
 import com.iodvd.fuqp.ui.fragment.ScopeFragmentArgs
 import com.iodvd.fuqp.ui.util.navController
 import com.iodvd.fuqp.ui.util.navigate
+import com.iodvd.fuqp.ui.util.registerOnBackCallback
 import com.iodvd.fuqp.ui.util.setEdge2EdgeFlags
 import com.iodvd.fuqp.ui.util.setupToolbar
 import kotlinx.coroutines.launch
@@ -61,7 +61,8 @@ class SettingsTemplateConfFragment : Fragment(R.layout.fragment_template_setting
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { onBack(false) }
+        registerOnBackCallback { onBack(false) }
+
         setupToolbar(
             toolbar = binding.toolbar,
             title = getString(R.string.title_settings_template_conf),

@@ -3,11 +3,11 @@ package com.iodvd.fuqp.ui.fragment
 import android.os.Bundle
 import android.view.MenuItem
 import android.view.View
-import androidx.activity.addCallback
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import dev.androidbroadcast.vbpd.viewBinding
 import com.iodvd.fuqp.ui.util.navController
+import com.iodvd.fuqp.ui.util.registerOnBackCallback
 import com.iodvd.fuqp.ui.util.setEdge2EdgeFlags
 import com.iodvd.fuqp.ui.util.setupToolbar
 import com.iodvd.fuqp.R
@@ -33,7 +33,7 @@ abstract class BaseSettingsPTFragment : Fragment(R.layout.fragment_settings_pt_b
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { onBack() }
+        registerOnBackCallback { onBack() }
 
         setupToolbar(
             toolbar = binding.toolbar,

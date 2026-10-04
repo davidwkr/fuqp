@@ -3,6 +3,7 @@ package com.iodvd.fuqp.ui.adapter
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
+import com.iodvd.fuqp.common.CollectionUtils.sync
 import com.iodvd.fuqp.common.FilterHolder
 import com.iodvd.fuqp.util.PackageHelper
 import com.iodvd.fuqp.databinding.StatItemViewBinding
@@ -34,11 +35,10 @@ class StatAdapter(private val onBeginWaitForRefresh: (StatAdapter) -> Unit) : Re
 
             logs[position] = StatItem(packageName, filterCount, refreshing)
 
-            val resort = logs.sortedWith { it1, it2 -> it1.totalCount.compareTo(it2.totalCount) }.asReversed()
-            val newIndex = resort.indexOfFirst { it.packageName == packageName }
+            val elements = logs.sortedWith { it1, it2 -> it1.totalCount.compareTo(it2.totalCount) }.asReversed()
+            val newIndex = elements.indexOfFirst { it.packageName == packageName }
 
-            logs.clear()
-            logs.addAll(resort)
+            logs.sync(elements)
 
             if (newIndex != position) {
                 notifyItemMoved(position, newIndex)

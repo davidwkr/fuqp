@@ -5,6 +5,7 @@ import android.view.View
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.navArgs
 import com.iodvd.fuqp.MyApp.Companion.fuqpApp
+import com.iodvd.fuqp.common.CollectionUtils.sync
 import com.iodvd.fuqp.service.PrefManager
 import com.iodvd.fuqp.ui.fragment.AppSelectFragment
 import com.iodvd.fuqp.util.PackageHelper
@@ -12,7 +13,7 @@ import com.iodvd.fuqp.util.PackageHelper.Comparators
 import kotlinx.coroutines.launch
 import com.iodvd.fuqp.ui.adapter.AppPresetAdapter
 
-class AppPresetFragment() : AppSelectFragment() {
+class AppPresetFragment : AppSelectFragment() {
 
     override val firstComparator: Comparator<String> = Comparator.comparing(PackageHelper::exists).reversed()
 
@@ -44,8 +45,7 @@ class AppPresetFragment() : AppSelectFragment() {
         val packages = adapter.packages.sortedWith(firstComparator.then(comparator))
 
         lifecycleScope.launch {
-            adapter.packages.clear()
-            adapter.packages += packages
+            adapter.packages.sync(packages)
         }
     }
 

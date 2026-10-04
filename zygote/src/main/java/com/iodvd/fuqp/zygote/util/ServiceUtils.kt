@@ -1,55 +1,47 @@
 package com.iodvd.fuqp.zygote.util
 
-import android.app.ActivityThread
-import android.content.Context.USER_SERVICE
 import android.content.pm.IPackageManager
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import android.os.Binder
 import android.os.Build
 import android.os.IBinder
-import android.os.IUserManager
+import android.os.RemoteException
 import android.os.ServiceManager
-import com.android.apksig.ApkVerifier
-import com.v7878.unsafe.Reflection.getDeclaredMethod
+import android.system.ErrnoException
+import android.system.Os
+import android.system.OsConstants
 import com.iodvd.fuqp.common.Constants
+import com.iodvd.fuqp.common.JsonConfig
 import com.iodvd.fuqp.common.PropertyUtils
 import com.iodvd.fuqp.common.Utils.binderLocalScope
-import com.iodvd.fuqp.common.Utils.conflictedModules
 import com.iodvd.fuqp.common.Utils.containsMultiple
 import com.iodvd.fuqp.common.Utils.getPackageInfoCompat
-import com.iodvd.fuqp.common.Utils.isAppInstalled
 import com.iodvd.fuqp.common.BuildConfig
 import com.iodvd.fuqp.zygote.Magic
-import com.iodvd.fuqp.zygote.service.FUQPService.Companion.service
 import com.iodvd.fuqp.zygote.util.Logcat.logE
 import com.iodvd.fuqp.zygote.util.Logcat.logI
 import com.iodvd.fuqp.zygote.util.Logcat.logV
 import com.iodvd.fuqp.zygote.util.ZLUtils.callMethod
-import com.iodvd.fuqp.zygote.util.ZLUtils.callMethodWithTypes
 import com.iodvd.fuqp.zygote.util.ZLUtils.findField
-import rikka.hidden.compat.UserManagerApis
 import java.io.File
-
 
 object ServiceUtils {
     private const val TAG = "ServiceUtils"
+    private val fileFlags = OsConstants.R_OK or OsConstants.W_OK
 
     @Throws(InterruptedException::class)
     fun waitForService(name: String?): IBinder? {
-        try {
-            return getDeclaredMethod(
-                ServiceManager::class.java,
-                "waitForService",
-                String::class.java,
-            ).invoke(null, name) as IBinder?
-        } catch (e: Throwable) {
-            logE(TAG, e) { "An error occurred on waitForService" }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            return ServiceManager.waitForService(name)
         }
 
         var service: IBinder? = null
+        var count = 0
 
         do {
             Thread.sleep(250)
-        } while ((ServiceManager.getService(name).also { service = it }) == null)
+        } while ((ServiceManager.getService(name).also { service = it }) == null && ++count < 100)
 
         return service
     }
@@ -58,7 +50,7 @@ object ServiceUtils {
         if (packageSettings == null) return null
 
         return try {
-            callMethod(packageSettings, "getPackageName") as String?
+            callMethod(packageSettings, "getPackageName") as? String
         } catch (_: Throwable) {
             runCatching {
                 findField(
@@ -69,62 +61,41 @@ object ServiceUtils {
         }
     }
 
-    val packageManager get() = ActivityThread.currentActivityThread().application.packageManager!!
-
-    val contentResolver get() = ActivityThread.currentActivityThread().application.contentResolver!!
-
-    fun getCallingApps(): Array<String> {
-        return getCallingApps(Binder.getCallingUid())
+    fun getCallingApps(pms: IPackageManager): Array<String> {
+        return getCallingApps(pms, Binder.getCallingUid())
     }
 
-    fun getCallingApps(callingUid: Int): Array<String> {
+    fun getCallingApps(pms: IPackageManager, callingUid: Int): Array<String> {
         if (callingUid == Constants.UID_SYSTEM) return arrayOf()
         return binderLocalScope {
-            service?.pms?.getPackagesForUid(callingUid)
+            pms.getPackagesForUid(callingUid)
         } ?: arrayOf()
     }
 
     fun findAndVerifyAppSignature(pms: IPackageManager): Int {
-        val userService = waitForService(USER_SERVICE)
-
         try {
-            val userManager = IUserManager.Stub.asInterface(userService)
-            val profiles = mutableSetOf<Int>().also { set ->
-                val userIds = UserManagerApis.getUserIdsNoThrow()
-
-                runCatching {
-                    userIds.forEach {
-                        val profiles = callMethodWithTypes(
-                            userManager,
-                            "getProfileIds",
-                            arrayOf(Int::class.javaPrimitiveType!!, Boolean::class.javaPrimitiveType!!),
-                            arrayOf(it, false),
-                        ) ?: return@forEach
-
-                        (profiles as IntArray).forEach { pId -> set.add(pId) }
-                    }
-                }.onFailure {
-                    set.addAll(userIds)
-                }
-            }
+            val profiles = UserManagerUtils.userIds
 
             for (uid in profiles) {
                 logV(TAG) { "@findAndVerifyAppSignature: checking for uid $uid" }
 
-                val pkgInfo = runCatching {
-                    pms.getPackageInfoCompat(BuildConfig.APP_PACKAGE_NAME, 0L, uid)
+                val packageInfo = runCatching {
+                    pms.getPackageInfoCompat(
+                        BuildConfig.APP_PACKAGE_NAME,
+                        PackageManager.GET_SIGNING_CERTIFICATES.toLong(),
+                        uid,
+                    )
                 }.getOrNull()
+                if (packageInfo == null) continue
 
-                if (pkgInfo != null) {
-                    if (verifyAppSignature(pkgInfo.applicationInfo?.sourceDir)) {
-                        val appUid = pkgInfo.applicationInfo!!.uid
+                if (verifyAppSignature(packageInfo)) {
+                    val appUid = packageInfo.applicationInfo!!.uid
 
-                        logI(TAG) { "The manager app signature is verified successfully, uid: $appUid" }
+                    logI(TAG) { "The manager app signature is verified successfully, uid: $appUid" }
 
-                        return appUid
-                    } else {
-                        throw AssertionError("The manager app is modified, skipping")
-                    }
+                    return appUid
+                } else {
+                    throw AssertionError("The manager app is modified, skipping")
                 }
             }
         } catch (e: Throwable) {
@@ -138,16 +109,11 @@ object ServiceUtils {
         return -1
     }
 
-    private fun verifyAppSignature(path: String?): Boolean {
-        if (path == null) return false
+    private fun verifyAppSignature(packageInfo: PackageInfo): Boolean {
+        val other = packageInfo.signingInfo
+            ?.signingCertificateHistory?.lastOrNull()?.toByteArray() ?: return false
 
-        val verifier = ApkVerifier.Builder(File(path))
-            .setMinCheckedPlatformVersion(24)
-            .build()
-        val result = verifier.verify()
-        if (!result.isVerified) return false
-        val mainCert = result.signerCertificates[0]
-        return mainCert.encoded.contentEquals(Magic.magicNumbers)
+        return Magic.magicNumbers.contentEquals(other)
     }
 
     fun clearStackTraces(throwableIn: Throwable?) {
@@ -174,12 +140,16 @@ object ServiceUtils {
         }
     }
 
-    fun IPackageManager.isConflictingModuleInstalled(): Boolean {
-        // we shouldn't apply hooks when the HMA/HMAL detected
-        return conflictedModules.any { isAppInstalled(it) }
-    }
+    fun isAppDataIsolationEnabled(config: JsonConfig) =
+        PropertyUtils.isAppDataIsolationEnabled || config.altAppDataIsolation
 
-    val sAppDataIsolationEnabled by lazy {
-        PropertyUtils.isAppDataIsolationEnabled || service?.config?.altAppDataIsolation == true
+    fun ensureFileIsRW(file: File, skipNoEntry: Boolean) {
+        try {
+            if (Os.access(file.absolutePath, fileFlags)) return
+        } catch (cause: ErrnoException) {
+            if (skipNoEntry && cause.errno == OsConstants.ENOENT) return
+        } catch (_: Throwable) {}
+
+        throw RemoteException("${file.absolutePath} is not accessible by the current UID")
     }
 }

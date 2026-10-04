@@ -26,3 +26,5 @@
 -keepattributes RuntimeVisibleAnnotations,AnnotationDefault
 
 -keep class com.iodvd.fuqp.common.** { *; }
+-dontwarn android.**
+-dontwarn com.android.**

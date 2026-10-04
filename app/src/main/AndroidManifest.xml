@@ -2,12 +2,21 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!--
+        This permission is used for:
+        - Check the updates
+        - Load the translator images
+
+        And it is your choice to enable its functionality in the app's settings
+    -->
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- This permission is used for make the package list changed listener work -->
     <uses-permission
         android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="PackageVisibilityPolicy,QueryAllPackagesPermission" />
 
+    <!-- This permission is used for uninstalling the conflicted packages -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
     <application
@@ -76,7 +85,7 @@
             android:name=".MainActivityLauncherAlt4"
             android:exported="true"
             android:enabled="false"
-            android:icon="@mipmap/ic_launcher_alt_5"
+            android:icon="@mipmap/ic_launcher_alt_4"
             android:targetActivity="com.iodvd.fuqp.ui.activity.MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -87,8 +96,7 @@
         <provider
             android:name="com.iodvd.fuqp.service.ServiceProvider"
             android:authorities="${applicationId}.ServiceProvider"
-            android:exported="true"
-            tools:ignore="ExportedContentProvider" />
+            android:exported="false" />
 
     </application>
 </manifest>

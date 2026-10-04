@@ -13,6 +13,7 @@ import androidx.fragment.app.Fragment
 import com.google.android.material.color.DynamicColors
 import com.iodvd.fuqp.service.PrefManager
 import com.iodvd.fuqp.R
+import com.iodvd.fuqp.ui.util.FixedSizeDrawable
 
 object ThemeUtils {
     private val colorThemeMap = mapOf(
@@ -132,6 +133,9 @@ object ThemeUtils {
     fun Fragment.homeItemBackgroundColor(forceNoTrans: Boolean = false) = requireContext().homeItemBackgroundColor(forceNoTrans)
 
     fun Int.asDrawable(context: Context) = ResourcesCompat.getDrawable(context.resources, this, context.theme)!!
+
+    fun Int.asDrawable(context: Context, sizeDp: Int) =
+        FixedSizeDrawable(asDrawable(context), sizeDp.dpToPx.toInt())
 
     fun Int.asColor(context: Context) = ResourcesCompat.getColor(context.resources, this, context.theme)
 }

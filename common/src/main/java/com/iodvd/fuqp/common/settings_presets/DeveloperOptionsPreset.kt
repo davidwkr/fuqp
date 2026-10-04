@@ -3,7 +3,11 @@ package com.iodvd.fuqp.common.settings_presets
 import android.provider.Settings
 import com.iodvd.fuqp.common.Constants
 
-class DeveloperOptionsPreset : BasePreset("dev_options") {
+class DeveloperOptionsPreset : BasePreset(NAME) {
+    companion object {
+        const val NAME = "dev_options"
+    }
+
     @Suppress("DEPRECATION")
     override val settingsKVPairs = listOf(
         ReplacementItem(

@@ -3,6 +3,7 @@ package com.iodvd.fuqp.common
 import android.content.pm.ApplicationInfo
 import android.content.pm.IPackageManager
 import android.util.Log
+import com.iodvd.fuqp.common.CollectionUtils.sync
 import com.iodvd.fuqp.common.Utils.getPackageInfoCompat
 import com.iodvd.fuqp.common.Utils.isSystemApp
 import com.iodvd.fuqp.common.app_presets.AccessibilityAppsPreset
@@ -17,6 +18,7 @@ import java.util.zip.ZipFile
 
 class AppPresets private constructor() {
     private val presetList = mutableMapOf<String, BasePreset>()
+    private val allAppsCache = mutableSetOf<String>()
 
     private val manifestDataCache = mutableMapOf<String, String>()
 
@@ -59,40 +61,44 @@ class AppPresets private constructor() {
             getPresetByName(presetName)?.packageNames?.addAll(elements)
         }
         RiskyPackageUtils.instance.importCache(cache.riskyPackageCache)
+        allAppsCache.addAll(cache.allAppsList)
     }
 
     fun exportCache() = PresetCache().apply {
         presetList.forEach { (k, v) -> cache[k] = v.packageNames.toMutableList() }
         riskyPackageCache.addAll(RiskyPackageUtils.instance.exportCache())
+        allAppsList.addAll(allAppsCache)
     }
 
     fun reloadPresets(appsList: List<ApplicationInfo>, fromScratch: Boolean) {
+        val packageNames = appsList.mapTo(HashSet()) { it.packageName }
+
         if (!fromScratch) {
-            val packageNames = appsList.mapTo(HashSet()) { it.packageName }
             RiskyPackageUtils.instance.removeAppsFromListIfNotExists(packageNames)
 
             presetList.values.forEach { preset ->
                 preset.packageNames.removeIf { it !in packageNames }
             }
 
-            // fromScratch = false is only called at boot process, we can return safely
-            return
+            if ((packageNames - allAppsCache).isEmpty()) {
+                return
+            }
+        } else {
+            RiskyPackageUtils.instance.clearAppList()
+            presetList.values.forEach { it.clearPackageList() }
         }
-
-        RiskyPackageUtils.instance.clearAppList()
-        presetList.values.forEach { it.clearPackageList() }
 
         appsList.forEach { appInfo ->
             val packageName = appInfo.packageName
 
-            if (packageName == "android") return@forEach
+            if (packageName in Constants.packagesShouldNotHide) return@forEach
 
-            runCatching {
+            try {
                 RiskyPackageUtils.instance.tryToAddIntoGMSConnectionList(appInfo) {
                     loggerFunction?.invoke(Log.DEBUG) { it }
                 }
-            }.onFailure { fail ->
-                loggerFunction?.invoke(Log.ERROR) { fail.toString() }
+            } catch (cause: Throwable) {
+                loggerFunction?.invoke(Log.ERROR) { cause.toString() }
             }
 
             presetList.values.forEach { preset ->
@@ -100,16 +106,17 @@ class AppPresets private constructor() {
 
                 if (preset is AccessibilityAppsPreset && appInfo.isSystemApp()) return@forEach
 
-                runCatching {
+                try {
                     preset.addPackageInfoPreset(appInfo)
-                }.onFailure { fail ->
-                    loggerFunction?.invoke(Log.ERROR) { fail.toString() }
+                } catch (cause: Throwable) {
+                    loggerFunction?.invoke(Log.ERROR) { cause.toString() }
                 }
 
                 loggerFunction?.invoke(Log.DEBUG) { preset.toString() }
             }
         }
 
+        allAppsCache.sync(packageNames)
         manifestDataCache.clear()
     }
 
@@ -121,6 +128,8 @@ class AppPresets private constructor() {
         packageName: String,
         onModifyCache: (preset: String) -> Unit,
     ) {
+        allAppsCache.add(packageName)
+
         if (presetList.any { it.value.containsPackage(packageName) }) {
             return
         }
@@ -133,16 +142,14 @@ class AppPresets private constructor() {
                 if (appInfo == null)
                     appInfo = pms.getPackageInfoCompat(packageName, 0, 0)?.applicationInfo
 
-                if (appInfo != null) {
-                    runCatching {
-                        if (it.value.addPackageInfoPreset(appInfo!!)) {
-                            onModifyCache(it.key)
-                            loggerFunction?.invoke(Log.DEBUG) { "Package $packageName added into ${it.key}!" }
-                            addedInAList = true
-                        }
-                    }.onFailure { fail ->
-                        loggerFunction?.invoke(Log.ERROR) { fail.toString() }
+                try {
+                    if (appInfo != null && it.value.addPackageInfoPreset(appInfo)) {
+                        onModifyCache(it.key)
+                        loggerFunction?.invoke(Log.DEBUG) { "Package $packageName added into ${it.key}!" }
+                        addedInAList = true
                     }
+                } catch (cause: Throwable) {
+                    loggerFunction?.invoke(Log.ERROR) { cause.toString() }
                 }
             }
         }
@@ -167,6 +174,8 @@ class AppPresets private constructor() {
         packageName: String,
         onModifyCache: (preset: String) -> Unit,
         ): Boolean {
+        allAppsCache.remove(packageName)
+
         var itWasInAList = false
 
         presetList.forEach {

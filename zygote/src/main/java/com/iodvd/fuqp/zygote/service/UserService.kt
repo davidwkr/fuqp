@@ -7,22 +7,21 @@ import android.os.Bundle
 import com.iodvd.fuqp.common.Constants
 import com.iodvd.fuqp.common.Utils.getUserFromCallingUid
 import com.iodvd.fuqp.common.BuildConfig
-import com.iodvd.fuqp.zygote.ZygoteEntry
-import com.iodvd.fuqp.zygote.service.FUQPService.Companion.service
+import com.iodvd.fuqp.zygote.util.ActivityManagerUtils
 import com.iodvd.fuqp.zygote.util.Logcat.logD
 import com.iodvd.fuqp.zygote.util.Logcat.logE
 import com.iodvd.fuqp.zygote.util.Logcat.logI
-import com.iodvd.fuqp.zygote.util.ServiceUtils.isConflictingModuleInstalled
 import com.iodvd.fuqp.zygote.util.ServiceUtils.waitForService
+import com.iodvd.fuqp.zygote.util.UidObserverAdapter
 import com.iodvd.fuqp.zygote.util.ZLUtils.getStaticIntField
-import rikka.hidden.compat.ActivityManagerApis
-import rikka.hidden.compat.adapter.UidObserverAdapter
 
 object UserService {
 
     private const val TAG = "FUQP-UserService"
 
     private val managerAppUid get() = service?.appUid ?: -1
+
+    var service: FUQPService? = null
 
     private val uidObserver = object : UidObserverAdapter() {
         override fun onUidActive(uid: Int) {
@@ -35,7 +34,8 @@ object UserService {
 
                 logD(TAG) { "Calculated user id: $userId" }
 
-                val provider = ActivityManagerApis.getContentProviderExternal(Constants.PROVIDER_AUTHORITY, userId, null, null)
+                val provider = ActivityManagerUtils.getContentProviderExternal(
+                    Constants.PROVIDER_AUTHORITY, userId, null, null)
                 assert (provider != null) {
                     "Failed to get provider"
                 }
@@ -61,17 +61,12 @@ object UserService {
     }
 
     fun register(pms: IPackageManager, pmn: Any?) {
+        assert(service == null) { "You cannot register the service more than once" }
+
         logI(TAG) { "Initialize FUQPService - Version ${BuildConfig.APP_VERSION_NAME}" }
 
-        val managerWorkMode = if (pms.isConflictingModuleInstalled()) {
-            logE(ZygoteEntry.TAG) { "Conflicting module detected, skipping hook" }
-            Constants.MANAGER_WORK_MODE_NO_HOOKS
-        } else {
-            Constants.MANAGER_WORK_MODE_LOADING
-        }
-
         waitForService("activity")
-        ActivityManagerApis.registerUidObserver(
+        ActivityManagerUtils.registerUidObserver(
             uidObserver,
             getActMgrField("UID_OBSERVER_ACTIVE"),
             getActMgrField("PROCESS_STATE_TOP"),
@@ -80,8 +75,7 @@ object UserService {
 
         logI(TAG) { "Registered observer" }
 
-        // no need to put in a variable
-        FUQPService(pms, pmn, managerWorkMode)
+        FUQPService(pms, pmn)
     }
 
     private fun getActMgrField(name: String) = getStaticIntField(

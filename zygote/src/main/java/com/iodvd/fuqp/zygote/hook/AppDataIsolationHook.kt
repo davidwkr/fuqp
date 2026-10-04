@@ -4,9 +4,9 @@ import android.annotation.SuppressLint
 import android.os.Build
 import android.os.SystemProperties
 import androidx.annotation.RequiresApi
+import com.iodvd.fuqp.common.OSUtils
+import com.iodvd.fuqp.common.PropertyUtils
 import com.iodvd.fuqp.common.BuildConfig
-import com.iodvd.fuqp.zygote.service.BulkHooker
-import com.iodvd.fuqp.zygote.service.FUQPService.Companion.service
 import com.iodvd.fuqp.zygote.service.SystemServerHook
 import com.iodvd.fuqp.zygote.util.Logcat.logD
 import com.iodvd.fuqp.zygote.util.Logcat.logE
@@ -22,6 +22,7 @@ import com.iodvd.fuqp.zygote.util.ZLUtils.thisObject
 import com.iodvd.fuqp.zygote.util.ZygoteConstants.PROCESS_LIST_CLASS
 import com.iodvd.fuqp.zygote.util.ZygoteConstants.PROCESS_RECORD_INTERNAL_CLASS
 import com.iodvd.fuqp.zygote.util.ZygoteConstants.STORAGE_MANAGER_SERVICE_CLASS
+import com.iodvd.fuqp.zygote.util.ZygoteConstants.STORAGE_MANAGER_SERVICE_LIFECYCLE_CLASS
 import java.util.Map
 
 @SuppressLint("PrivateApi")
@@ -45,18 +46,17 @@ class AppDataIsolationHook : IFrameworkHook {
         )
     }
 
-    private val isAltIsolationEnabled get() = config?.let {
-        it.altAppDataIsolation || it.altVoldAppDataIsolation
-    } ?: false
-
-    private val config get() = service?.config
+    private val isAltIsolationEnabled get() = config.let {
+        (!PropertyUtils.isAppDataIsolationEnabled && it.altAppDataIsolation) ||
+        (!PropertyUtils.isVoldAppDataIsolationEnabled && it.altVoldAppDataIsolation)
+    }
 
     @SuppressLint("PrivateApi")
     override fun load() {
         if (!isAltIsolationEnabled) return
         logI(TAG) { "Load hook" }
 
-        BulkHooker.instance.apply {
+        hooker.apply {
             hookBefore(
                 PROCESS_LIST_CLASS,
                 "startProcess",
@@ -65,7 +65,7 @@ class AppDataIsolationHook : IFrameworkHook {
                     Class.forName(PROCESS_LIST_CLASS, true, SystemServerHook.classLoader)
                 }.getOrNull()
 
-                if (config?.altAppDataIsolation ?: false) {
+                if (config.altAppDataIsolation) {
                     val isEnabled = getBooleanField(
                         frame.thisObject,
                         APPDATA_ISOLATION_ENABLED,
@@ -84,7 +84,7 @@ class AppDataIsolationHook : IFrameworkHook {
                     }
                 }
 
-                if (config?.altVoldAppDataIsolation ?: false && !voldHookSkipped) {
+                if (config.altVoldAppDataIsolation && !voldHookSkipped) {
                     val fuseEnabled = SystemProperties.getBoolean(FUSE_PROP, false)
 
                     if (!fuseEnabled) {
@@ -111,117 +111,156 @@ class AppDataIsolationHook : IFrameworkHook {
                 }
             }
 
-            hookAfter(
-                PROCESS_LIST_CLASS,
-                "needsStorageDataIsolation",
-            ) { _, frame, returnValue ->
-                if (config?.altVoldAppDataIsolation ?: false) {
-                    val app = frame.args.find { it?.javaClass?.simpleName == "ProcessRecord" }!!
-                    val uid = runCatching {
-                        getIntField(app, "uid")
-                    }.getOrElse {
-                        getIntField(app, "uid", processRecordIntClass)
-                    }
+            if (OSUtils.isSamsung()) {
+                hookAfter(
+                    STORAGE_MANAGER_SERVICE_LIFECYCLE_CLASS,
+                    "onStart"
+                ) { _, frame, _ ->
+                    if (config.altVoldAppDataIsolation && !voldHookSkipped) {
+                        val fuseEnabled = SystemProperties.getBoolean(FUSE_PROP, false)
 
-                    val apps = getCallingApps(uid)
-
-                    if (config?.detailLog ?: false) {
-                        val processName = runCatching {
-                            getObjectField(app, "processName")
-                        }.getOrElse {
-                            getObjectField(app, "processName", processRecordIntClass)
-                        }
-                        val mountNode = runCatching {
-                            getIntField(app, "mMountMode")
-                        }.getOrDefault(0)
-                        val isolated = runCatching {
-                            getBooleanField(app, "isolated")
-                        }.getOrElse {
-                            getBooleanField(app, "isolated", processRecordIntClass)
-                        }
-                        val appZygote = runCatching {
-                            getBooleanField(app, "appZygote")
-                        }.getOrElse {
-                            getBooleanField(app, "appZygote", processRecordIntClass)
+                        if (!fuseEnabled) {
+                            logE(TAG) { "StorageManagerService - FUSE storage is not enabled, skip vold hook" }
+                            voldHookSkipped = true
+                            return@hookAfter
                         }
 
-                        logD(TAG) { "@needsStorageDataIsolation $uid and ${apps.contentToString()} - $processName value without override: ${returnValue.result}, mount node: $mountNode, isolated: $isolated, appZygote: $appZygote" }
+                        val storageManagerService = getObjectField(
+                            frame.thisObject,
+                            "mStorageManagerService",
+                        )!!
+
+                        val isolationEnabled = getBooleanField(
+                            storageManagerService,
+                            VOLD_APPDATA_ISOLATION_ENABLED,
+                        )
+
+                        if (!isolationEnabled) {
+                            setBooleanField(
+                                storageManagerService,
+                                VOLD_APPDATA_ISOLATION_ENABLED,
+                                true,
+                            )
+
+                            logI(TAG) { "StorageManagerService - Vold app data isolation is forced" }
+                        }
                     }
+                }
+            } else {
+                hookBefore(
+                    STORAGE_MANAGER_SERVICE_CLASS,
+                    "onVolumeStateChangedLocked",
+                ) { _, frame, _ ->
+                    if (config.altVoldAppDataIsolation && !voldHookSkipped) {
+                        val fuseEnabled = SystemProperties.getBoolean(FUSE_PROP, false)
 
-                    // Do not isolate this module for safety
-                    if (apps.contains(BuildConfig.APP_PACKAGE_NAME)) {
-                        returnValue.result = false
-                        return@hookAfter
+                        if (!fuseEnabled) {
+                            logE(TAG) { "StorageManagerService - FUSE storage is not enabled, skip vold hook" }
+                            voldHookSkipped = true
+                            return@hookBefore
+                        }
+
+                        val storageManagerService = frame.thisObject
+
+                        val isolationEnabled = getBooleanField(
+                            storageManagerService,
+                            VOLD_APPDATA_ISOLATION_ENABLED,
+                        )
+
+                        if (!isolationEnabled) {
+                            setBooleanField(
+                                storageManagerService,
+                                VOLD_APPDATA_ISOLATION_ENABLED,
+                                true,
+                            )
+
+                            logI(TAG) { "StorageManagerService - Vold app data isolation is forced" }
+                        }
                     }
+                }
 
-                    if (apps.any { service?.isAppDataIsolationExcluded(it) ?: false }) {
-                        returnValue.result = false
-                        return@hookAfter
-                    }
+                hookAfter(
+                    PROCESS_LIST_CLASS,
+                    "needsStorageDataIsolation",
+                ) { _, frame, returnValue ->
+                    if (config.altVoldAppDataIsolation) {
+                        val app = frame.args.find { it?.javaClass?.simpleName == "ProcessRecord" }!!
+                        val uid = runCatching {
+                            getIntField(app, "uid")
+                        }.getOrElse {
+                            getIntField(app, "uid", processRecordIntClass)
+                        }
 
-                    if (config?.skipSystemAppDataIsolation ?: false) {
-                        val isSystemApp = service?.systemApps?.any { apps.contains(it) } ?: false
-                        logD(TAG) { "@needsStorageDataIsolation $uid and ${apps.contentToString()} - isSystemApp: $isSystemApp" }
+                        val apps = getCallingApps(pms, uid)
 
-                        if (isSystemApp) {
+                        if (config.detailLog) {
+                            val processName = runCatching {
+                                getObjectField(app, "processName")
+                            }.getOrElse {
+                                getObjectField(app, "processName", processRecordIntClass)
+                            }
+                            val mountNode = runCatching {
+                                getIntField(app, "mMountMode")
+                            }.getOrDefault(0)
+                            val isolated = runCatching {
+                                getBooleanField(app, "isolated")
+                            }.getOrElse {
+                                getBooleanField(app, "isolated", processRecordIntClass)
+                            }
+                            val appZygote = runCatching {
+                                getBooleanField(app, "appZygote")
+                            }.getOrElse {
+                                getBooleanField(app, "appZygote", processRecordIntClass)
+                            }
+
+                            logD(TAG) { "@needsStorageDataIsolation $uid and ${apps.contentToString()} - $processName value without override: ${returnValue.result}, mount node: $mountNode, isolated: $isolated, appZygote: $appZygote" }
+                        }
+
+                        // Do not isolate this module for safety
+                        if (apps.contains(BuildConfig.APP_PACKAGE_NAME)) {
                             returnValue.result = false
                             return@hookAfter
                         }
-                    }
-                }
-            }
 
-            hookBefore(
-                STORAGE_MANAGER_SERVICE_CLASS,
-                "onVolumeStateChangedLocked",
-            ) { _, frame, _ ->
-                if (config?.altVoldAppDataIsolation ?: false && !voldHookSkipped) {
-                    val fuseEnabled = SystemProperties.getBoolean(FUSE_PROP, false)
+                        if (apps.any { service.isAppDataIsolationExcluded(it) }) {
+                            returnValue.result = false
+                            return@hookAfter
+                        }
 
-                    if (!fuseEnabled) {
-                        logE(TAG) { "StorageManagerService - FUSE storage is not enabled, skip vold hook" }
-                        voldHookSkipped = true
-                        return@hookBefore
-                    }
+                        if (config.skipSystemAppDataIsolation) {
+                            val isSystemApp = systemApps.any { apps.contains(it) }
+                            logD(TAG) { "@needsStorageDataIsolation $uid and ${apps.contentToString()} - isSystemApp: $isSystemApp" }
 
-                    val isolationEnabled = getBooleanField(
-                        frame.thisObject,
-                        VOLD_APPDATA_ISOLATION_ENABLED,
-                    )
-
-                    if (!isolationEnabled) {
-                        setBooleanField(
-                            frame.thisObject,
-                            VOLD_APPDATA_ISOLATION_ENABLED,
-                            true,
-                        )
-
-                        logI(TAG) { "StorageManagerService - Vold app data isolation is forced" }
-                    }
-                }
-            }
-
-            hookBefore(
-                STORAGE_MANAGER_SERVICE_CLASS,
-                "remountAppStorageDirs",
-            ) { _, frame, _ ->
-                if (!voldHookSkipped && config?.altVoldAppDataIsolation ?: false && config?.skipSystemAppDataIsolation ?: false) {
-                    @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
-                    val pidPkgMap = frame.getArgument(1) as Map<*, *>
-                    val keysToRemove = mutableSetOf<Any>()
-
-                    for (entry in pidPkgMap.entrySet()) {
-                        val pid = entry.key
-                        val packageName = entry.value as String
-
-                        if (packageName in service!!.systemApps || packageName == BuildConfig.APP_PACKAGE_NAME) {
-                            logD(TAG) { "@remountAppStorageDirs SYSTEM $pid - $packageName is marked to remove" }
-                            keysToRemove += pid
-                            break
+                            if (isSystemApp) {
+                                returnValue.result = false
+                                return@hookAfter
+                            }
                         }
                     }
+                }
 
-                    keysToRemove.forEach { pidPkgMap.remove(it) }
+                hookBefore(
+                    STORAGE_MANAGER_SERVICE_CLASS,
+                    "remountAppStorageDirs",
+                ) { _, frame, _ ->
+                    if (!voldHookSkipped && config.altVoldAppDataIsolation && config.skipSystemAppDataIsolation) {
+                        @Suppress("PLATFORM_CLASS_MAPPED_TO_KOTLIN")
+                        val pidPkgMap = frame.getArgument(1) as Map<*, *>
+                        val keysToRemove = mutableSetOf<Any>()
+
+                        for (entry in pidPkgMap.entrySet()) {
+                            val pid = entry.key
+                            val packageName = entry.value as String
+
+                            if (packageName in systemApps || packageName == BuildConfig.APP_PACKAGE_NAME) {
+                                logD(TAG) { "@remountAppStorageDirs SYSTEM $pid - $packageName is marked to remove" }
+                                keysToRemove += pid
+                                break
+                            }
+                        }
+
+                        keysToRemove.forEach { pidPkgMap.remove(it) }
+                    }
                 }
             }
         }

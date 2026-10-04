@@ -9,12 +9,9 @@ import android.os.Build
 import com.v7878.unsafe.Reflection.getDeclaredField
 import com.v7878.unsafe.invoke.EmulatedStackFrame
 import com.iodvd.fuqp.common.Constants
-import com.iodvd.fuqp.common.OSUtils
 import com.iodvd.fuqp.common.Utils.getPackageName
-import com.iodvd.fuqp.common.Utils.getPackageUidCompat
 import com.iodvd.fuqp.common.Utils.getUserFromCallingUid
 import com.iodvd.fuqp.zygote.service.BulkHooker
-import com.iodvd.fuqp.zygote.service.FUQPService.Companion.service
 import com.iodvd.fuqp.zygote.service.ReturnValue
 import com.iodvd.fuqp.zygote.service.SystemServerHook
 import com.iodvd.fuqp.zygote.util.Logcat.logD
@@ -73,7 +70,7 @@ class ActivityHook : IFrameworkHook {
     override fun load() {
         logI(TAG) { "Load hook" }
 
-        BulkHooker.instance.apply {
+        hooker.apply {
             hookBefore(
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                     ACTIVITY_TASK_SUPERVISOR_CLASS
@@ -93,63 +90,71 @@ class ActivityHook : IFrameworkHook {
                 else -> COMPUTER_ENGINE_CLASS
             }
 
-            if (!OSUtils.isSamsung()) {
-                hookBefore(
-                    aPRFClazz,
-                    "applyPostResolutionFilter",
-                ) { methodName, frame, _ ->
-                    @Suppress("UNCHECKED_CAST") // I know what I do
-                    val list = frame.args[1] as List<ResolveInfo>?
+            // Filters the returned list after the original has run. Samsung is included: One UI
+            // reads back the list it passed in rather than the returned one, so the input list is
+            // trimmed to match as well.
+            hookAfter(
+                aPRFClazz,
+                "applyPostResolutionFilter",
+            ) { methodName, frame, returnValue ->
+                @Suppress("UNCHECKED_CAST") // I know what I do
+                val list = returnValue.result as? List<ResolveInfo>
 
-                    if (DIAG) logD(TAG) { resolveEntryDiag(methodName, frame, list) }
+                if (DIAG) logD(TAG) { resolveEntryDiag(methodName, frame, list) }
 
-                    if (list.isNullOrEmpty()) {
-                        if (DIAG) logD(TAG) { "@$methodName: exit, no candidates" }
-                        return@hookBefore
-                    }
+                if (list.isNullOrEmpty()) {
+                    if (DIAG) logD(TAG) { "@$methodName: exit, no candidates" }
+                    return@hookAfter
+                }
 
-                    val callingUid = frame.getArgument(APRF_FILTER_CALLING_UID) as? Int ?: run {
-                        if (DIAG) logD(TAG) { "@$methodName: exit, unexpected signature" }
-                        return@hookBefore
-                    }
-                    if (callingUid == Constants.UID_SYSTEM) {
-                        if (DIAG) logD(TAG) { "@$methodName: exit, system uid" }
-                        return@hookBefore
-                    }
+                val callingUid = frame.getArgument(APRF_FILTER_CALLING_UID) as? Int ?: run {
+                    if (DIAG) logD(TAG) { "@$methodName: exit, unexpected signature" }
+                    return@hookAfter
+                }
+                if (callingUid == Constants.UID_SYSTEM) {
+                    if (DIAG) logD(TAG) { "@$methodName: exit, system uid" }
+                    return@hookAfter
+                }
 
-                    val callingUserId = getUserFromCallingUid(callingUid)
-                    val callingApps = getCallingApps(callingUid)
-                    val caller = callingApps.firstOrNull { service?.isHookEnabled(it) ?: false }
-                    if (caller == null) {
-                        if (DIAG) logD(TAG) { "@$methodName: exit, no scoped caller for $callingUid" }
-                        return@hookBefore
-                    }
+                val callingUserId = getUserFromCallingUid(callingUid)
+                val callingApps = getCallingApps(pms, callingUid)
+                val caller = callingApps.firstOrNull { service.isHookEnabled(it) }
+                if (caller == null) {
+                    if (DIAG) logD(TAG) { "@$methodName: exit, no scoped caller for $callingUid" }
+                    return@hookAfter
+                }
 
-                    logV(TAG) { "@$methodName: $caller requested a resolve info" }
+                logV(TAG) { "@$methodName: $caller requested a resolve info" }
 
-                    val filteredList = list.filter { resolveInfo ->
-                        val targetApp = resolveInfo.getPackageName()
+                val filteredList = list.filter { resolveInfo ->
+                    val targetApp = resolveInfo.getPackageName()
 
-                        logV(TAG) { "@$methodName: Checking $targetApp for $caller" }
+                    logV(TAG) { "@$methodName: Checking $targetApp for $caller" }
 
-                        (!(service?.shouldHideActivityLaunch(caller, targetApp, callingUserId) ?: false)).apply {
-                            if (!this) {
-                                logD(TAG) { "@$methodName: insecure query from $caller, target: $targetApp" }
-                            }
+                    (!service.shouldHideActivityLaunch(caller, targetApp, callingUserId)).apply {
+                        if (!this) {
+                            logD(TAG) { "@$methodName: insecure query from $caller, target: $targetApp" }
                         }
                     }
+                }
 
-                    if (filteredList.size != list.size) {
-                        frame.setArgument(1, filteredList)
+                val removed = list.size - filteredList.size
+                if (removed > 0) {
+                    returnValue.result = filteredList
 
-                        service?.increasePMFilterCount(caller, list.size - filteredList.size)
+                    // one ui uses the list it passed in instead of the returned one,
+                    // so drop the entries from that object too
+                    (list as? MutableList<ResolveInfo>)?.let {
+                        runCatching { it.retainAll(filteredList.toSet()) }
                     }
+
+                    service.increasePMFilterCount(caller, removed)
                 }
             }
 
-            val isInxLockerAvailable = service != null && service!!.pms.getPackageUidCompat(
-                "io.github.chimio.inxlocker", 0, 0
-            ) >= 0
+            val isInxLockerAvailable = pms.isPackageAvailable(
+                "io.github.chimio.inxlocker", 0,
+            )
 
             if (isInxLockerAvailable) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -194,7 +199,6 @@ class ActivityHook : IFrameworkHook {
                     ACTIVITY_STARTER_CLASS,
                     "execute",
                 ) { methodName, frame, returnValue ->
-                    if (service == null) return@hookBefore
                     val request = requestField.get(frame.getArgument(0)) ?: return@hookBefore
 
                     guardRequest(methodName, request, fields, returnValue)
@@ -209,7 +213,7 @@ class ActivityHook : IFrameworkHook {
         fields: RequestFields,
         returnValue: ReturnValue,
     ) {
-        val svc = service ?: return
+        val svc = service
 
         val caller = fields.callingPackage.get(request) as? String ?: return
         if (!svc.isHookEnabled(caller)) return
@@ -245,7 +249,7 @@ class ActivityHook : IFrameworkHook {
     }
 
     private fun guardFrame(methodName: String, frame: EmulatedStackFrame, returnValue: ReturnValue) {
-        val svc = service ?: return
+        val svc = service
 
         val caller = frame.getArgument(PRE_R_CALLING_PACKAGE) as? String ?: return
         if (!svc.isHookEnabled(caller)) return

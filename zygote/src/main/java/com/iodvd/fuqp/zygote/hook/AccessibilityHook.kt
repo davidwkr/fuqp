@@ -3,8 +3,6 @@ package com.iodvd.fuqp.zygote.hook
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.pm.ParceledListSlice
 import com.iodvd.fuqp.common.settings_presets.AccessibilityPreset
-import com.iodvd.fuqp.zygote.service.BulkHooker
-import com.iodvd.fuqp.zygote.service.FUQPService.Companion.service
 import com.iodvd.fuqp.zygote.util.Logcat.logD
 import com.iodvd.fuqp.zygote.util.ServiceUtils
 import com.iodvd.fuqp.zygote.util.ZLUtils.returnType
@@ -14,12 +12,12 @@ class AccessibilityHook : IFrameworkHook {
     override val TAG = "AccessibilityHook"
 
     override fun load() {
-        BulkHooker.instance.apply {
+        hooker.apply {
             hookBefore(
                 ACCESSIBILITY_SERVICE_CLASS,
                 "getEnabledAccessibilityServiceList",
             ) { methodName, frame, returnValue ->
-                val callingApps = ServiceUtils.getCallingApps()
+                val callingApps = ServiceUtils.getCallingApps(pms)
                 if (callingApps.isEmpty()) return@hookBefore
 
                 val caller = callingApps.firstOrNull { callerIsSpoofed(it) }
@@ -39,7 +37,7 @@ class AccessibilityHook : IFrameworkHook {
                 ACCESSIBILITY_SERVICE_CLASS,
                 "addClient",
             ) { _, _, returnValue ->
-                val callingApps = ServiceUtils.getCallingApps()
+                val callingApps = ServiceUtils.getCallingApps(pms)
                 if (callingApps.isEmpty()) return@hookBefore
 
                 val caller = callingApps.firstOrNull { callerIsSpoofed(it) }
@@ -51,5 +49,5 @@ class AccessibilityHook : IFrameworkHook {
     }
 
     private fun callerIsSpoofed(caller: String) =
-        service?.getEnabledSettingsPresets(caller)?.contains(AccessibilityPreset.NAME) ?: false
+        service.getEnabledSettingsPresets(caller).contains(AccessibilityPreset.NAME)
 }

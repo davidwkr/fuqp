@@ -62,19 +62,16 @@ data class JsonConfig(
     var skipSystemAppDataIsolation: Boolean = true,
 
     /**
-     * Use alternative path to query packages
-     *
-     * This option is useful for querying packages from other profiles,
-     * or bypassing some of Chinese OEM ROM (MIUI, HyperOS, ...) restrictions
-     * while trying to get package lists in the manager app
-     */
-    var packageQueryWorkaround: Boolean = false,
-
-    /**
      * Enable WebView protection to prevent some crashes caused by misconfigurations
      * for WebView or Browser apps
      */
     var webViewProtection: Boolean = true,
+
+    /**
+     * Enable ignorance of brand-level protections
+     * It will be used in app data isolation for now
+     */
+    var ignoreBrandProtections: Boolean = false,
 
     /**
      * This config will be applied for ALL of new apps when enabled

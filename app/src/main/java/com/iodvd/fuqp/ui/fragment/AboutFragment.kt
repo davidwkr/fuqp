@@ -3,6 +3,8 @@ package com.iodvd.fuqp.ui.fragment
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.BitmapFactory
+import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.LayerDrawable
 import android.os.Bundle
 import android.view.View
 import android.widget.LinearLayout
@@ -23,7 +25,9 @@ import com.iodvd.fuqp.common.Constants
 import com.iodvd.fuqp.data.AppConstants.allAppIcons
 import com.iodvd.fuqp.service.PrefManager
 import com.iodvd.fuqp.ui.util.AccessibilityUtils
+import com.iodvd.fuqp.ui.util.ThemeUtils.attrDrawable
 import com.iodvd.fuqp.ui.util.ThemeUtils.homeItemBackgroundColor
+import com.iodvd.fuqp.ui.util.dpToPx
 import com.iodvd.fuqp.ui.util.navController
 import com.iodvd.fuqp.ui.util.setEdge2EdgeFlags
 import com.iodvd.fuqp.util.PackageHelper.findEnabledAppComponent
@@ -33,7 +37,7 @@ import com.iodvd.fuqp.databinding.FragmentAboutBinding
 import com.iodvd.fuqp.databinding.FragmentAboutListItemBinding
 import org.json.JSONObject
 
-@Suppress("deprecation")
+@Suppress("DEPRECATION")
 class AboutFragment : Fragment(R.layout.fragment_about) {
     private val binding by viewBinding(FragmentAboutBinding::bind)
 
@@ -98,6 +102,15 @@ class AboutFragment : Fragment(R.layout.fragment_about) {
         }
 
         with(binding.devHeader) {
+            background = LayerDrawable(arrayOf(
+                GradientDrawable().apply {
+                    setColor(0)
+                    cornerRadius = 24.dpToPx
+                },
+                attrDrawable(android.R.attr.selectableItemBackground),
+            ))
+            clipToOutline = true
+
             setOnClickListener {
                 if (binding.listHma.isVisible) {
                     binding.expandDevs.animate().rotation(0.0f).start()
@@ -114,6 +127,7 @@ class AboutFragment : Fragment(R.layout.fragment_about) {
         with(binding.listFuqp) {
             addDevItem(this, R.drawable.cont_fk, "frknkrc44", "HMA-OSS Developer", "https://github.com/frknkrc44")
             addDevItem(this, R.drawable.cont_oukaromf, "OukaroMF", "HMA-OSS Alt Icon Designer", "https://github.com/OukaroMF")
+            addDevItem(this, R.drawable.cont_chunqiu, "longze", "HMA-OSS Contributor", null)
         }
 
         // Original HMA devs
@@ -142,11 +156,13 @@ class AboutFragment : Fragment(R.layout.fragment_about) {
             clipToOutline = true
 
             addLibraryItem(this, "ZygoteLoader (fork)", "MIT License", "https://github.com/aerath-stuff/ZygoteLoader")
+            addLibraryItem(this, "AndroidVMTools (fork)", "MIT License", "https://github.com/aerath-stuff/AndroidVMTools")
+            addLibraryItem(this, "PanamaPort (fork)", "MIT License", "https://github.com/aerath-stuff/PanamaPort")
             addLibraryItem(this, "Coil", "Apache-2.0 License", "https://github.com/coil-kt/coil")
         }
     }
 
-    fun addDevItem(layout: LinearLayout, @DrawableRes avatarResId: Int, name: String, desc: String, url: String) {
+    fun addDevItem(layout: LinearLayout, @DrawableRes avatarResId: Int, name: String, desc: String, url: String?) {
         val newLayout = FragmentAboutListItemBinding.inflate(layoutInflater)
         setOnClickUrl(newLayout.root, url)
 
@@ -193,10 +209,12 @@ class AboutFragment : Fragment(R.layout.fragment_about) {
         layout.addView(newLayout.root)
     }
 
-    fun setOnClickUrl(view: View, url: String) {
+    fun setOnClickUrl(view: View, url: String?) {
+        if (url == null) return
+
         view.setOnClickListener {
             val intent = Intent(Intent.ACTION_VIEW)
-            intent.setData(url.toUri())
+            intent.data = url.toUri()
             startActivity(intent)
         }
     }

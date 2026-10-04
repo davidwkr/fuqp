@@ -9,7 +9,7 @@ import androidx.core.view.isVisible
 import dev.androidbroadcast.vbpd.CreateMethod
 import dev.androidbroadcast.vbpd.viewBinding
 import com.iodvd.fuqp.ui.util.ThemeUtils.themeColor
-import com.iodvd.fuqp.ui.util.dp2Px
+import com.iodvd.fuqp.ui.util.dpToPx
 import com.iodvd.fuqp.R
 import com.iodvd.fuqp.databinding.ListItemViewBinding
 
@@ -73,7 +73,7 @@ class ListItemView @JvmOverloads constructor(
             )
             setTextColor(textColor)
 
-            val padding = dp2Px(resources, 8).toInt()
+            val padding = 8.dpToPx.toInt()
             setPaddingRelative(paddingStart, padding, paddingEnd, padding)
         }
     }

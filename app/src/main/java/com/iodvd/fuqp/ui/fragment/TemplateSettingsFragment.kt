@@ -2,7 +2,6 @@ package com.iodvd.fuqp.ui.fragment
 
 import android.os.Bundle
 import android.view.View
-import androidx.activity.addCallback
 import androidx.core.widget.addTextChangedListener
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.clearFragmentResultListener
@@ -16,6 +15,7 @@ import dev.androidbroadcast.vbpd.viewBinding
 import com.iodvd.fuqp.service.ConfigManager
 import com.iodvd.fuqp.ui.util.navController
 import com.iodvd.fuqp.ui.util.navigate
+import com.iodvd.fuqp.ui.util.registerOnBackCallback
 import com.iodvd.fuqp.ui.util.setEdge2EdgeFlags
 import com.iodvd.fuqp.ui.util.setupToolbar
 import com.iodvd.fuqp.ui.viewmodel.TemplateSettingsViewModel
@@ -57,7 +57,8 @@ class TemplateSettingsFragment : Fragment(R.layout.fragment_template_settings) {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        requireActivity().onBackPressedDispatcher.addCallback(viewLifecycleOwner) { onBack(false) }
+        registerOnBackCallback { onBack(false) }
+
         setupToolbar(
             toolbar = binding.toolbar,
             title = getString(R.string.title_template_settings),

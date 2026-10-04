@@ -13,6 +13,8 @@ import com.iodvd.fuqp.zygote.util.Logcat.logI
 import com.iodvd.fuqp.zygote.util.Logcat.logV
 import com.iodvd.fuqp.zygote.util.ServiceUtils.waitForService
 import com.iodvd.fuqp.zygote.util.ZLUtils.callStaticMethod
+import com.iodvd.fuqp.zygote.util.ZygoteConstants.PACKAGE_MANAGER_NATIVE_SERVICE
+import com.iodvd.fuqp.zygote.util.ZygoteConstants.PACKAGE_MANAGER_SERVICE
 import com.iodvd.fuqp.zygote.util.ZygoteConstants.RUNTIME_INIT_CLASS
 import com.iodvd.fuqp.zygote.util.ZygoteConstants.SYSTEM_SERVER_CLASS
 import com.iodvd.fuqp.zygote.util.ZygoteConstants.ZYGOTE_INIT_CLASS
@@ -23,7 +25,6 @@ object SystemServerHook {
     private const val TAG = "SystemServerHook"
 
     var classLoader: ClassLoader? = null
-    var initialized = false
 
     @Throws(Throwable::class)
     fun onSystemServer(loader: ClassLoader?) {
@@ -33,20 +34,16 @@ object SystemServerHook {
 
         classLoader = loader
 
-        if (!initialized) {
-            initialized = true
+        thread {
+            val pms = waitForService(PACKAGE_MANAGER_SERVICE) as IPackageManager
+            val pmn = waitForService(PACKAGE_MANAGER_NATIVE_SERVICE)
+            logD(TAG) { "Got pms: $pms, $pmn" }
 
-            thread {
-                val pms = waitForService("package") as IPackageManager
-                val pmn = waitForService("package_native")
-                logD(TAG) { "Got pms: $pms, $pmn" }
-
-                runCatching {
-                    UserService.register(pms, pmn)
-                    logI(TAG) { "User service started" }
-                }.onFailure {
-                    logE(TAG, it) { "System service crashed" }
-                }
+            try {
+                UserService.register(pms, pmn)
+                logI(TAG) { "User service started" }
+            } catch (cause: Throwable) {
+                logE(TAG, cause) { "System service crashed" }
             }
         }
     }

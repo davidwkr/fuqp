@@ -7,11 +7,10 @@ import com.iodvd.fuqp.receiver.AppChangeReceiver
 import com.iodvd.fuqp.service.ConfigManager
 import com.iodvd.fuqp.service.PrefManager
 import com.iodvd.fuqp.service.ServiceClient
-import com.iodvd.fuqp.util.ConfigUtils.Companion.getLocale
+import com.iodvd.fuqp.util.ConfigUtils.getLocale
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import me.zhanghai.android.appiconloader.AppIconLoader
-import com.iodvd.fuqp.R
+import java.util.Locale
 
 class MyApp : Application() {
     companion object {
@@ -19,27 +18,31 @@ class MyApp : Application() {
     }
 
     val globalScope = CoroutineScope(Dispatchers.Default)
-    val appIconLoader by lazy {
-        val iconSize = resources.getDimensionPixelSize(R.dimen.app_icon_size)
-        AppIconLoader(iconSize, false, this)
-    }
     var updateDialogSkipped: Boolean = false
 
-    @Suppress("DEPRECATION")
     fun loadConfiguration() {
         if (ServiceClient.serviceVersion > 0) {
             ConfigManager.init()
-
-            AppCompatDelegate.setDefaultNightMode(PrefManager.darkTheme)
-            val config = resources.configuration
-            config.setLocale(getLocale())
-            resources.updateConfiguration(config, resources.displayMetrics)
         }
+    }
+
+    fun loadPreferences() {
+        AppCompatDelegate.setDefaultNightMode(PrefManager.darkTheme)
+
+        reloadLocale(getLocale())
+    }
+
+    @Suppress("DEPRECATION")
+    fun reloadLocale(locale: Locale) {
+        val config = resources.configuration
+        config.setLocale(locale)
+        resources.updateConfiguration(config, resources.displayMetrics)
     }
 
     override fun onCreate() {
         super.onCreate()
         fuqpApp = this
+        loadPreferences()
         AppChangeReceiver.register(this)
 
         val handler = Thread.getDefaultUncaughtExceptionHandler()

@@ -1,6 +1,7 @@
 package com.iodvd.fuqp.common.app_presets
 
 import android.content.pm.ApplicationInfo
+import com.iodvd.fuqp.common.Constants
 import java.util.zip.ZipFile
 
 abstract class BasePreset(val name: String) {
@@ -18,6 +19,9 @@ abstract class BasePreset(val name: String) {
 
     fun addPackageInfoPreset(appInfo: ApplicationInfo): Boolean {
         val packageName = appInfo.packageName
+
+        if (packageName in Constants.packagesShouldNotHide) return false
+
         if (!containsPackage(packageName) && canBeAddedIntoPreset(appInfo)) {
             packageNames.add(packageName)
             return true

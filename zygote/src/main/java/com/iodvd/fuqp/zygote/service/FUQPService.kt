@@ -4,14 +4,11 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.IPackageManager
-import android.content.pm.PackageManager
-import android.content.pm.ResolveInfo
 import android.os.Build
 import android.os.Bundle
 import android.os.ParcelFileDescriptor
 import android.os.RemoteException
 import android.provider.Settings
-import android.util.Log
 import com.iodvd.fuqp.common.AppPresets
 import com.iodvd.fuqp.common.CollectionUtils.removeIf
 import com.iodvd.fuqp.common.Constants
@@ -26,10 +23,10 @@ import com.iodvd.fuqp.common.SettingsPresets
 import com.iodvd.fuqp.common.Utils.binderLocalScope
 import com.iodvd.fuqp.common.Utils.cleanRemnantsFromConfig
 import com.iodvd.fuqp.common.Utils.conflictedModules
+import com.iodvd.fuqp.common.Utils.encoder
 import com.iodvd.fuqp.common.Utils.generateRandomString
 import com.iodvd.fuqp.common.Utils.getInstalledApplicationsCompat
 import com.iodvd.fuqp.common.Utils.getPackageInfoCompat
-import com.iodvd.fuqp.common.Utils.isAppInstalled
 import com.iodvd.fuqp.common.Utils.isSystemApp
 import com.iodvd.fuqp.common.settings_presets.ReplacementItem
 import com.iodvd.fuqp.common.BuildConfig
@@ -40,7 +37,10 @@ import com.iodvd.fuqp.zygote.hook.BroadcastHook
 import com.iodvd.fuqp.zygote.hook.ContentProviderHook
 import com.iodvd.fuqp.zygote.hook.IFrameworkHook
 import com.iodvd.fuqp.zygote.hook.ImmHook
-import com.iodvd.fuqp.zygote.hook.PlatformCompatHook
+import com.iodvd.fuqp.zygote.hook.InstallerHookTarget29
+import com.iodvd.fuqp.zygote.hook.InstallerHookTarget30
+import com.iodvd.fuqp.zygote.hook.InstallerHookTarget33
+import com.iodvd.fuqp.zygote.hook.InstallerHookTarget34
 import com.iodvd.fuqp.zygote.hook.PmsHookTarget29
 import com.iodvd.fuqp.zygote.hook.PmsHookTarget30
 import com.iodvd.fuqp.zygote.hook.PmsHookTarget31
@@ -48,31 +48,39 @@ import com.iodvd.fuqp.zygote.hook.PmsHookTarget33
 import com.iodvd.fuqp.zygote.hook.PmsHookTarget34
 import com.iodvd.fuqp.zygote.hook.PmsPackageEventsHook
 import com.iodvd.fuqp.zygote.hook.ZygoteHook
+import com.iodvd.fuqp.zygote.util.ActivityManagerUtils
 import com.iodvd.fuqp.zygote.util.BrowserUtils.getDefaultBrowser
+import com.iodvd.fuqp.zygote.util.BrowserUtils.getWebviewProvider
 import com.iodvd.fuqp.zygote.util.Logcat.logD
 import com.iodvd.fuqp.zygote.util.Logcat.logE
 import com.iodvd.fuqp.zygote.util.Logcat.logI
 import com.iodvd.fuqp.zygote.util.Logcat.logW
 import com.iodvd.fuqp.zygote.util.Logcat.logWithLevel
+import com.iodvd.fuqp.zygote.util.PackageManagerUtils.findApp
+import com.iodvd.fuqp.zygote.util.PackageManagerUtils.getLaunchIntentForPackageAsUser
+import com.iodvd.fuqp.zygote.util.PackageManagerUtils.isConflictingModuleInstalled
+import com.iodvd.fuqp.zygote.util.ServiceUtils.ensureFileIsRW
 import com.iodvd.fuqp.zygote.util.ServiceUtils.findAndVerifyAppSignature
-import com.iodvd.fuqp.zygote.util.ServiceUtils.packageManager
-import com.iodvd.fuqp.zygote.util.WebViewUtils.getWebviewProvider
-import com.iodvd.fuqp.zygote.util.ZLUtils.callMethodWithTypes
-import rikka.hidden.compat.ActivityManagerApis
-import rikka.hidden.compat.UserManagerApis
+import com.iodvd.fuqp.zygote.util.UserManagerUtils
 import java.io.File
-import java.io.FileInputStream
 import java.lang.reflect.Modifier
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import kotlin.io.path.Path
 
-class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWorkMode: Int) : IFUQPService.Stub() {
+class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub() {
 
     companion object {
         private const val TAG = "FUQP-Service"
-        var service: FUQPService? = null
     }
 
     @Volatile
     private var logcatAvailable = false
+
+    val hooker = BulkHooker()
+    val dataHolder = FUQPServiceDataHolder()
+
+    private var managerWorkMode: Int = Constants.MANAGER_WORK_MODE_UNKNOWN
 
     private lateinit var dataDir: String
     private lateinit var configFile: File
@@ -81,6 +89,7 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
     private lateinit var filterCountFile: File
     private lateinit var logFile: File
     private lateinit var oldLogFile: File
+    private lateinit var moduleStatusFile: File
 
     private val configLock = Any()
     private val loggerLock = Any()
@@ -92,12 +101,17 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
     var config = JsonConfig().apply { detailLog = true }
         private set
 
-    var filterHolder = FilterHolder()
-        private set
-
     init {
+        managerWorkMode = if (pms.isConflictingModuleInstalled()) {
+            logE(TAG) { "Conflicting module detected, skipping hook" }
+            Constants.MANAGER_WORK_MODE_NO_HOOKS
+        } else {
+            Constants.MANAGER_WORK_MODE_LOADING
+        }
+
         searchDataDir()
-        service = this
+        saveModuleStatus()
+        UserService.service = this
         loadFilterCount()
         loadConfig()
 
@@ -106,12 +120,18 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
         if (managerWorkMode != Constants.MANAGER_WORK_MODE_NO_HOOKS) {
             installHooks()
 
-            AppPresets.instance.loggerFunction = { level, msg ->
-                logWithLevel(level, "AppPresets", msg = msg)
-            }
-            loadPresetCache()
+            if (hooker.hooksWasCrashed) {
+                managerWorkMode = Constants.MANAGER_WORK_MODE_CRASHED
+            } else {
+                AppPresets.instance.loggerFunction = { level, msg ->
+                    logWithLevel(level, "AppPresets", msg = msg)
+                }
+                loadPresetCache()
 
-            managerWorkMode = Constants.MANAGER_WORK_MODE_OK
+                managerWorkMode = Constants.MANAGER_WORK_MODE_OK
+            }
+
+            saveModuleStatus()
         }
 
         logI(TAG) { "FUQP service initialized in mode $managerWorkMode" }
@@ -145,36 +165,53 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
             )
         }
 
-        File("$dataDir/log").mkdirs()
-        configFile = File("$dataDir/config.json")
-        presetCacheFileOld = File("$dataDir/preset_cache.json")
-        presetCacheFileNew = File("$dataDir/preset_cache_v2.json")
-        filterCountFile = File("$dataDir/filter_count.json")
-        logFile = File("$dataDir/log/runtime.log")
-        oldLogFile = File("$dataDir/log/old.log")
-        logFile.renameTo(oldLogFile)
-        logFile.createNewFile()
+        val logDir = File(dataDir, "log").apply { mkdirs() }
+        configFile = File(dataDir, "config.json")
+        presetCacheFileOld = File(dataDir, "preset_cache.json")
+        presetCacheFileNew = File(dataDir, "preset_cache_v2.json")
+        filterCountFile = File(dataDir, "filter_count.json")
+        logFile = File(logDir, "runtime.log")
+        oldLogFile = File(logDir, "old.log")
+        moduleStatusFile = File(dataDir, "status.json")
+
+        clearLogs()
 
         logcatAvailable = true
         logI(TAG) { "Data dir: $dataDir" }
+
+        try {
+            // make the map issues easier to debug
+            Files.copy(
+                Path("/proc/self/maps"),
+                Path(dataDir, "maps_module_thread.txt"),
+                StandardCopyOption.REPLACE_EXISTING,
+            )
+        } catch (cause: Throwable) {
+            logE(TAG, cause) { "An error occurred while copying the map file" }
+        }
+    }
+
+    fun saveModuleStatus() {
+        try {
+            val json = mapOf(
+                "workMode" to managerWorkMode,
+                "managerUid" to appUid,
+            )
+
+            ensureFileIsRW(moduleStatusFile, true)
+            moduleStatusFile.writeText(encoder.encodeToString(json))
+        } catch (cause: Throwable) {
+            logE(TAG, cause) { "An error occurred while writing the status JSON" }
+        }
     }
 
     private fun loadConfig() {
         // remove the old filter count
         File("$dataDir/filter_count").also {
-            runCatching {
+            try {
                 if (it.exists()) it.delete()
-            }.onFailure { e ->
-                logW(TAG, e) { "Failed to delete filter count, skip it" }
-            }
-        }
-
-        // remove the old preset cache
-        presetCacheFileOld.also {
-            runCatching {
-                if (it.exists()) it.delete()
-            }.onFailure { e ->
-                logW(TAG, e) { "Failed to delete preset cache, skip it" }
+            } catch (cause: Throwable) {
+                logW(TAG, cause) { "Failed to delete filter count, skip it" }
             }
         }
 
@@ -186,8 +223,8 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
         val loading = try {
             val json = configFile.readText()
             JsonConfig.parse(json)
-        } catch (it: Throwable) {
-            logW(TAG, it) { "Failed to parse config.json, skip it" }
+        } catch (cause: Throwable) {
+            logW(TAG, cause) { "Failed to parse config json, skip it" }
 
             config
         }
@@ -214,14 +251,23 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
             val json = filterCountFile.readText()
             FilterHolder.parse(json)
         }.getOrElse {
-            logE(TAG, it) { "Failed to parse filter_count.json" }
+            logE(TAG, it) { "Failed to parse filter count" }
             return
         }
-        filterHolder = loading
+        dataHolder.filterHolder = loading
         logI(TAG) { "Filter counts loaded" }
     }
 
     private fun loadPresetCache() {
+        // remove the old preset cache
+        presetCacheFileOld.also {
+            try {
+                if (it.exists()) it.delete()
+            } catch (cause: Throwable) {
+                logW(TAG, cause) { "Failed to delete preset cache, skip it" }
+            }
+        }
+
         var isFileAvailable = presetCacheFileNew.exists()
 
         if (isFileAvailable) {
@@ -243,28 +289,29 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
     }
 
     private fun installHooks() {
-        pms.getInstalledApplicationsCompat(PackageManager.MATCH_ALL.toLong(), 0)
-            .mapNotNullTo(systemApps) { appInfo ->
-                if (appInfo.isSystemApp()) appInfo.packageName else null
+        pms.allPackages.filterTo(systemApps) {
+            pms.getPackageInfoCompat(
+                it, 0L, 0)?.applicationInfo?.isSystemApp() ?: false
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             frameworkHooks.add(PmsHookTarget34())
+            frameworkHooks.add(InstallerHookTarget34())
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             frameworkHooks.add(PmsHookTarget33())
+            frameworkHooks.add(InstallerHookTarget33())
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             frameworkHooks.add(PmsHookTarget31())
+            frameworkHooks.add(InstallerHookTarget30())
         } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             frameworkHooks.add(PmsHookTarget30())
+            frameworkHooks.add(InstallerHookTarget30())
         } else {
             frameworkHooks.add(PmsHookTarget29())
+            frameworkHooks.add(InstallerHookTarget29())
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
-                frameworkHooks.add(PlatformCompatHook())
-            }
-
             frameworkHooks.add(AppDataIsolationHook())
         }
 
@@ -280,58 +327,29 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
         logI(TAG) { "Hooks installed" }
     }
 
-    fun increasePMFilterCount(callingUid: Int?, amount: Int = 1) = increaseFilterCount(
-        callingUid, amount, FilterHolder.FilterType.PACKAGE_MANAGER
+    fun increasePMFilterCount(callingUid: Int?, amount: Int = 1) = dataHolder.increaseFilterCount(
+        callingUid, amount, FilterHolder.FilterType.PACKAGE_MANAGER, ::writeFilterCount
     )
 
-    fun increasePMFilterCount(caller: String?, amount: Int = 1) = increaseFilterCount(
-        caller, amount, FilterHolder.FilterType.PACKAGE_MANAGER
+    fun increasePMFilterCount(caller: String?, amount: Int = 1) = dataHolder.increaseFilterCount(
+        caller, amount, FilterHolder.FilterType.PACKAGE_MANAGER, ::writeFilterCount
     )
 
-    fun increaseALFilterCount(caller: String?, amount: Int = 1) = increaseFilterCount(
-        caller, amount, FilterHolder.FilterType.ACTIVITY_LAUNCH
+    fun increaseALFilterCount(caller: String?, amount: Int = 1) = dataHolder.increaseFilterCount(
+        caller, amount, FilterHolder.FilterType.ACTIVITY_LAUNCH, ::writeFilterCount
     )
 
-    fun increaseInstallerFilterCount(caller: String?, amount: Int = 1) = increaseFilterCount(
-        caller, amount, FilterHolder.FilterType.INSTALLER
+    fun increaseInstallerFilterCount(caller: String?, amount: Int = 1) = dataHolder.increaseFilterCount(
+        caller, amount, FilterHolder.FilterType.INSTALLER, ::writeFilterCount
     )
 
-    fun increaseSettingsFilterCount(caller: String?, amount: Int = 1) = increaseFilterCount(
-        caller, amount, FilterHolder.FilterType.SETTINGS
+    fun increaseSettingsFilterCount(caller: String?, amount: Int = 1) = dataHolder.increaseFilterCount(
+        caller, amount, FilterHolder.FilterType.SETTINGS, ::writeFilterCount
     )
 
-    fun increaseOthersFilterCount(caller: String?, amount: Int = 1) = increaseFilterCount(
-        caller, amount, FilterHolder.FilterType.OTHERS
+    fun increaseOthersFilterCount(caller: String?, amount: Int = 1) = dataHolder.increaseFilterCount(
+        caller, amount, FilterHolder.FilterType.OTHERS, ::writeFilterCount
     )
-
-    fun increaseFilterCount(uid: Int?, amount: Int = 1, filterType: FilterHolder.FilterType) {
-        if (uid == null || amount < 1) return
-
-        val caller = FUQPServiceCache.instance.findCallerByUid(uid) ?: return
-
-        return increaseFilterCount(caller, amount, filterType)
-    }
-
-    fun increaseFilterCount(caller: String?, amount: Int = 1, filterType: FilterHolder.FilterType) {
-        if (caller == null || amount < 1) return
-
-        synchronized(configLock) {
-            if (!filterHolder.filterCounts.containsKey(caller)) {
-                filterHolder.filterCounts[caller] = FilterHolder.FilterCount()
-            }
-
-            val filterCount = filterHolder.filterCounts[caller]!!
-            when (filterType) {
-                FilterHolder.FilterType.PACKAGE_MANAGER -> filterCount.packageManagerCount += amount
-                FilterHolder.FilterType.ACTIVITY_LAUNCH -> filterCount.activityLaunchCount += amount
-                FilterHolder.FilterType.INSTALLER -> filterCount.installerCount += amount
-                FilterHolder.FilterType.SETTINGS -> filterCount.settingsCount += amount
-                FilterHolder.FilterType.OTHERS -> filterCount.othersCount += amount
-            }
-        }
-
-        writeFilterCount()
-    }
 
     fun isHookEnabled(packageName: String?) = config.scope.containsKey(packageName)
 
@@ -347,7 +365,9 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
 
         val templates = getEnabledSettingsTemplates(caller)
         val replacement = config.settingsTemplates.firstNotNullOfOrNull { (key, value) ->
-            if (key in templates) value.settingsList.firstOrNull { it.name == name } else null
+            if (key in templates) value.settingsList.firstOrNull {
+                it.name == name && it.database == database
+            } else null
         }
         if (replacement != null) return replacement
 
@@ -385,7 +405,7 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
             if (webviewProvider == caller || webviewProvider == query) return false
 
             // check for current browser
-            val currentBrowser = getDefaultBrowser(userId)
+            val currentBrowser = getDefaultBrowser(pmn, userId)
             if (currentBrowser == caller || currentBrowser == query) return false
         }
 
@@ -446,11 +466,11 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
         if (caller == query && appConfig.excludeTargetInstallationSource) return Constants.FAKE_INSTALLATION_SOURCE_DISABLED
 
         try {
-            val installed = pms.isAppInstalled(query, callingUser)
+            val installed = pms.isPackageAvailable(query, callingUser)
             logD(TAG) { "@shouldHideInstallationSource UID for $caller, ${callingUser}: $query, $installed" }
             if (!installed) return Constants.FAKE_INSTALLATION_SOURCE_DISABLED // invalid package installation source request
-        } catch (e: Throwable) {
-            logD(TAG, e) { "@shouldHideInstallationSource UID error for $caller, $callingUser" }
+        } catch (cause: Throwable) {
+            logD(TAG, cause) { "@shouldHideInstallationSource UID error for $caller, $callingUser" }
             return Constants.FAKE_INSTALLATION_SOURCE_DISABLED
         }
 
@@ -484,11 +504,11 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
         }
     }
 
-    override fun writeConfig(json: String) {
+    fun writeConfig(json: String) {
         if (!ensureManagerWorkModeOK()) return
 
         synchronized(configLock) {
-            runCatching {
+            try {
                 val newConfig = JsonConfig.parse(json)
                 newConfig.cleanRemnantsFromConfig()
                 if (newConfig.configVersion != BuildConfig.CONFIG_VERSION) {
@@ -496,15 +516,16 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
                     return
                 }
                 config = newConfig
+                ensureFileIsRW(configFile, true)
                 configFile.writeText(json)
-                FUQPServiceCache.instance.clearUidCache()
+                dataHolder.clearUidCache()
 
                 // remove filter counts for apps if they are not in config
-                filterHolder.filterCounts.removeIf { key, _ -> !config.scope.containsKey(key) }
-            }.onSuccess {
+                dataHolder.filterHolder
+                    .filterCounts.removeIf { key, _ -> !config.scope.containsKey(key) }
                 logD(TAG) { "Config synced" }
-            }.onFailure {
-                return@synchronized
+            } catch (cause: Throwable) {
+                logE(TAG, cause) { "An error occurred while writing config" }
             }
         }
 
@@ -515,27 +536,23 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
         if (!ensureManagerWorkModeOK()) return
 
         synchronized(configLock) {
-            if (!force && filterHolder.totalCount % 100 != 0) {
+            if (!force && dataHolder.filterHolder.totalCount % 100 != 0) {
                 return
             }
 
-            runCatching {
-                filterCountFile.writeText(filterHolder.toString())
-            }.onSuccess {
+            try {
+                ensureFileIsRW(filterCountFile, true)
+                filterCountFile.writeText(detailedFilterStats)
                 logD(TAG) { "Filter count synced" }
-            }.onFailure {
-                return@onFailure
+            } catch (cause: Throwable) {
+                logE(TAG, cause) { "An error occurred while writing filter count" }
             }
         }
     }
 
     override fun getServiceVersion() = BuildConfig.SERVICE_VERSION
 
-    override fun getFilterCount() = filterHolder.totalCount
-
-    override fun getLogs() = synchronized(loggerLock) {
-        logFile.readText()
-    }
+    override fun getFilterCount() = dataHolder.filterHolder.totalCount
 
     override fun clearLogs() {
         if (!ensureManagerWorkModeOK()) return
@@ -574,7 +591,7 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
 
                     // Handle app presets
                     handlePackageAdded(pms, packageName) { preset ->
-                        if (FUQPServiceCache.instance.addIntoPresetCache(preset, packageName)) {
+                        if (dataHolder.addIntoPresetCache(preset, packageName)) {
                             writePresetCache()
                         }
                     }
@@ -591,9 +608,17 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
                         appUid = findAndVerifyAppSignature(pms)
                     }
 
-                    // Handle app presets
-                    handlePackageRemoved(packageName) { preset ->
-                        if (FUQPServiceCache.instance.removeFromPresetCache(preset, packageName)) {
+                    // Handle app presets if the app is removed entirely
+                    if (!pms.findApp(packageName)) {
+                        var removedFromPresets = false
+
+                        handlePackageRemoved(packageName) { preset ->
+                            if (dataHolder.removeFromPresetCache(preset, packageName)) {
+                                removedFromPresets = true
+                            }
+                        }
+
+                        if (removedFromPresets) {
                             writePresetCache()
                         }
                     }
@@ -605,14 +630,12 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
     override fun getPackagesForPreset(presetName: String) =
         AppPresets.instance.getPresetByName(presetName)?.packages?.toTypedArray()
 
-    override fun readConfig() = config.toString()
-
     override fun forceStop(packageName: String?, userId: Int) {
         binderLocalScope {
-            runCatching {
-                ActivityManagerApis.forceStopPackage(packageName, userId)
-            }.onFailure { error ->
-                this.log(Log.ERROR, TAG, error.stackTraceToString())
+            try {
+                ActivityManagerUtils.forceStopPackage(packageName!!, userId)
+            } catch (cause: Throwable) {
+                logE(TAG, cause) { "An error occurred while force stopping the package" }
             }
         }
     }
@@ -622,7 +645,9 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
     }
 
     override fun getPackageNames(userId: Int) = binderLocalScope {
-        pms.getInstalledApplicationsCompat(0L, userId).map { it.packageName }.toTypedArray()
+        pms.getAllPackages().filter { packageName ->
+            pms.isPackageAvailable(packageName, userId)
+        }.toTypedArray()
     }
 
     override fun getPackageInfo(
@@ -654,7 +679,7 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
 
         val apps = mutableListOf<ApplicationInfo>().apply {
             binderLocalScope {
-                UserManagerApis.getUserIdsNoThrow().forEach { id ->
+                UserManagerUtils.userIds.forEach { id ->
                     addAll(pms.getInstalledApplicationsCompat(0L, id))
                 }
             }
@@ -663,27 +688,28 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
         AppPresets.instance.reloadPresets(apps, fromScratch)
         logI(TAG) { "All presets are loaded" }
 
-        FUQPServiceCache.instance.presetCache = AppPresets.instance.exportCache()
+        dataHolder.presetCache = AppPresets.instance.exportCache()
 
         writePresetCache()
     }
 
     fun writePresetCache() {
-        runCatching {
-            presetCacheFileNew.writeText(FUQPServiceCache.instance.presetCache.toString())
+        try {
+            ensureFileIsRW(presetCacheFileNew, true)
+            presetCacheFileNew.writeText(dataHolder.presetCache.toString())
             logD(TAG) { "Preset cache synced" }
-        }.onFailure {
-            logE(TAG, it) { "Failed to write into preset cache file" }
+        } catch (cause: Throwable) {
+            logE(TAG, cause) { "Failed to write into preset cache file" }
         }
     }
 
     override fun reloadPresetsFromScratch() = reloadPresets(true)
 
-    override fun getDetailedFilterStats() = filterHolder.toString()
+    override fun getDetailedFilterStats() = dataHolder.filterHolder.toString()
 
     override fun clearFilterStats() {
         synchronized(configLock) {
-            filterHolder.filterCounts.clear()
+            dataHolder.filterHolder.filterCounts.clear()
         }
 
         writeFilterCount(true)
@@ -694,13 +720,13 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
     override fun getLoadedHooks(): Array<String> {
         val hookList = mutableListOf<String>()
 
-        for ((className, hookElements) in BulkHooker.instance.hooks) {
+        for ((className, hookElements) in hooker.hooks) {
             for (element in hookElements) {
                 hookList.add(
                     JsonConfig.HookItem(
                         className,
                         element.methodName,
-                        element.paramCount,
+                        element.argumentCount,
                     ).toString()
                 )
             }
@@ -712,6 +738,7 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
     override fun readFD(type: Int): ParcelFileDescriptor {
         return when (type) {
             PARCEL_TYPE_LOG -> {
+                ensureFileIsRW(logFile, false)
                 ParcelFileDescriptor.open(logFile, ParcelFileDescriptor.MODE_READ_ONLY)
             }
             PARCEL_TYPE_CONFIG -> {
@@ -722,17 +749,14 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
     }
 
     override fun writeFD(type: Int, fd: ParcelFileDescriptor) {
-        val receiveStream = FileInputStream(fd.fileDescriptor)
-
         when (type) {
             PARCEL_TYPE_CONFIG -> {
-                writeConfig(receiveStream.readBytes().decodeToString())
+                ParcelFileDescriptor.AutoCloseInputStream(fd).use { input ->
+                    writeConfig(input.bufferedReader(Charsets.UTF_8).readText())
+                }
             }
             else -> throw RemoteException("Invalid type for write: $type")
         }
-
-        receiveStream.close()
-        fd.close()
     }
 
     override fun getManagerWorkMode() = managerWorkMode
@@ -744,7 +768,7 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
         if (pkgInfo.applicationInfo?.enabled == true) {
             val intentToLaunch = getLaunchIntentForPackageAsUser(packageName, userId)
             if (intentToLaunch != null) {
-                ActivityManagerApis.startActivity(intentToLaunch, null, userId)
+                ActivityManagerUtils.startActivity(intentToLaunch, userId)
             } else {
                 throw RemoteException("No main activity found to launch this app")
             }
@@ -790,47 +814,5 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?, private var managerWo
         config = loading
     }
 
-    // This part is a copy of Android code
-    fun getLaunchIntentForPackageAsUser(packageName: String, userId: Int): Intent? {
-        // I am lazy to call IPackageManager
-        @Suppress("UNCHECKED_CAST")
-        fun queryIntentActivitiesAsUser(intent: Intent, userId: Int) = callMethodWithTypes(
-            packageManager,
-            "queryIntentActivitiesAsUser",
-            arrayOf(
-                Intent::class.java,
-                Int::class.javaPrimitiveType!!,
-                Int::class.javaPrimitiveType!!,
-            ),
-            arrayOf(intent, /* flags */ 0, userId)
-        ) as List<ResolveInfo>?
-
-        val intentToResolve = Intent(Intent.ACTION_MAIN).apply {
-            addCategory(Intent.CATEGORY_INFO)
-            setPackage(packageName)
-        }
-
-        var resolveInfos = queryIntentActivitiesAsUser(intentToResolve, userId)
-        if (resolveInfos.isNullOrEmpty()) {
-            intentToResolve.apply {
-                removeCategory(Intent.CATEGORY_INFO)
-                addCategory(Intent.CATEGORY_LAUNCHER)
-                setPackage(packageName)
-            }
-
-            resolveInfos = queryIntentActivitiesAsUser(intentToResolve, userId)
-        }
-
-        return if (resolveInfos.isNullOrEmpty()) {
-            null
-        } else {
-            Intent(intentToResolve).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK
-
-                resolveInfos.first().activityInfo.let {
-                    setClassName(it.packageName, it.name)
-                }
-            }
-        }
-    }
+    override fun getUserProfiles() = binderLocalScope { UserManagerUtils.userIds }
 }
