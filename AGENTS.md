@@ -68,10 +68,10 @@ belong in Crowdin.
 
 `app_name` is `translatable="false"`, so it lives only in the source file.
 
-`settings_data_isolation_summary` takes three arguments and uses **positional** specifiers
-(`%1$s`, `%2$s`, `%3$s`) in every locale. They were converted by hand across all 26 files;
-Crowdin still has the old bare `%s` in its translation memory, so the next Crowdin sync will
-revert them unless the source string is updated in Crowdin first.
+Strings with more than one argument use **positional** specifiers (`%1$s`, `%2$s`, …) in every
+locale. Crowdin's translation memory still holds bare `%s`, so every Crowdin sync or upstream sync
+can reintroduce them. Re-run `tools/upstream-sync/positional_args.py` afterwards; it converts any
+string with two or more bare specifiers and reports what it touched.
 
 ## Resource size limit
 
@@ -79,17 +79,13 @@ aapt2 cannot encode a string longer than 32767 bytes into the resource string po
 silently substitutes the literal `STRING_TOO_LARGE`, which turns the affected resource into
 garbage at inflate time rather than failing the build.
 
-`app/src/main/res/drawable/ic_launcher_alt_5_foreground.xml` is a traced illustration whose
-largest `pathData` sits at ~31.7 KB, about 1 KB under that ceiling. It was brought under the
-limit losslessly (dropping zero-length `v0` no-ops and redundant leading zeros — no coordinate
-was changed). **If this asset is ever re-exported from the source art it will very likely blow
-the limit again.** Check with:
+`app/src/main/res/drawable/ic_launcher_alt_4_foreground.xml` (upstream's `ic_launcher_alt_5` before
+the 2026-10 sync; same artwork, renamed) is a traced illustration that upstream ships with one
+`pathData` at 33,835 bytes — over the ceiling. Ours is brought to ~31.7 KB losslessly by
+`tools/upstream-sync/shrink_vector_paths.py`: it drops zero-length `v0` no-ops and redundant
+leading zeros, then compares the traced point sequence before and after and refuses to write if
+any coordinate moved.
 
-```
-python3 - <<'EOF'
-import re,glob
-for f in glob.glob('app/src/main/res/**/*.xml', recursive=True):
-    for m in re.finditer(r'="([^"]*)"', open(f, encoding='utf-8').read()):
-        if len(m.group(1).encode()) > 32767: print(f, len(m.group(1)))
-EOF
-```
+**Upstream's copy is still oversized, so any sync or asset re-export brings the problem back,
+possibly under another file name.** Run the script with no arguments after every sync; it scans
+all of `app/src/main/res` and prints nothing when everything is under the limit.

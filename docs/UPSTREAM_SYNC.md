@@ -88,7 +88,7 @@ Never do the rework on the feature branch; it stays untouched until the sync bra
 |---|---|
 | A line upstream changed that we had only rebranded (log tags, script messages, `OSUtils` header) | Take upstream, re-apply our name: `tools/upstream-sync/resolve_theirs.py FILE 'OLD=NEW' …` |
 | Translations (`values-*/strings.xml`) | Take upstream's newer Crowdin text, rename (`'HMA-OSS=F-U Query Package' ' HMA = F-U Query Package '`), then run `positional_args.py`. Keep `HMA/HMAL` — those name the upstream closed-source apps. |
-| Upstream deleted a file we only touched cosmetically | Accept the deletion (`git rm`) after confirming nothing still references it. |
+| Upstream deleted a file we had changed | First check it is not a **rename**: `git diff -M --stat <LAST_SYNCED> <NEW_UPSTREAM> -- <dir>`. A merge against the synthetic base reports a rename-on-their-side as "deleted by them", and accepting that silently keeps upstream's unfixed copy under the new name. Only if it is truly gone: `git rm` it, after confirming nothing references it. |
 | Code where both sides changed logic | Port **our feature onto upstream's new design**. Never revert an upstream refactor to make our old code fit. |
 
 ### 6. Post-merge sweep — clean merges can still be wrong
@@ -108,6 +108,13 @@ Pay particular attention to anything written into a **directory shared by every 
 files there `hmaoss.sh`; ours must have a different name (`fuqp.sh`) or installing FUQP overwrites
 HMA-OSS's copy and uninstalling FUQP deletes it. Likewise any hardcoded `/data/adb/modules/<id>`
 must use `fuqp_zygisk`.
+
+Re-run the resource fixers; upstream ships both problems and every sync brings them back:
+
+```sh
+tools/upstream-sync/positional_args.py      # bare %s in multi-argument strings
+tools/upstream-sync/shrink_vector_paths.py  # vector pathData over aapt2's 32767-byte limit
+```
 
 Expected leftovers that are correct and must stay: the About-screen credits ("HMA-OSS Developer",
 …), `Constants.TRANSLATE_URL`, and the `translators.json` fallback URL in `app/build.gradle.kts`.
@@ -245,21 +252,46 @@ su <uid> -c "pm list packages" | grep -c app.grapheneos.logviewer    # control, 
 ### 6. Resources and housekeeping
 
 - Positional format arguments (`positional_args.py`) — Crowdin reverts them; rerun every sync.
-- No string-pool value over 32767 bytes (aapt2 silently writes `STRING_TOO_LARGE`). Check with
-  the snippet in `AGENTS.md`.
+- No string-pool value over 32767 bytes, or aapt2 silently writes `STRING_TOO_LARGE` and the
+  drawable renders as garbage. Upstream's alt launcher icon (`ic_launcher_alt_4`, formerly
+  `alt_5`) has a 33,835-byte path; `shrink_vector_paths.py` fixes it losslessly. Verify with
+  `./gradlew :app:processDebugResources --rerun-tasks` and grep the output for `STRING_TOO_LARGE`.
 - `.gitignore` entries for agent state; docs `AGENTS.md`, `REBRAND.md`, `TODO.md`, this file.
 
 ## Known divergences to decide on
+
+Behaviour inherited from upstream in the 2026-10-04 sync that differs from what we had before:
 
 - **Upstream's QPR3 `ZygoteHook` modern path** (`hookIntoZygoteProcessModern`) forces
   `bindMountAppsData` for pre-R top apps without checking the `forceMountData` setting, unlike its
   own legacy path. We took upstream's `ZygoteHook` unchanged in the 2026-10-04 sync.
 - **Upstream dropped the `getPackageStates` hook.** Enumeration is now filtered by
   `shouldFilterApplication` alone. Feature 4 does not depend on it.
+- **By-name lookups now run the original, then blank the result** (`hookAfter`), instead of
+  skipping the original (`hookBefore`).
+- **`applyPostResolutionFilter` filtering applies on Samsung too**, and trims One UI's input list.
+- **A KernelSU manager/driver version mismatch only warns** during install; it no longer aborts.
+- **Hook-install circuit breaker.** `BulkHooker.hooksWasCrashed`: once one hook crashes while
+  installing, every later hook is skipped and the module keeps running partly protected. Our
+  intent-query hook registers last on API 33+, so it is the first casualty. Look for
+  `queryIntentActivitiesInternal bound` and `Invalid hook removed` in logcat after every flash.
+- **Service version 102 → 105 and a changed `IFUQPService`** (`writeConfig`, `getLogs`,
+  `readConfig` removed; `getUserProfiles` added). Flashing updates the manager app at once but the
+  old module keeps running until reboot, so the manager misbehaves in that window. Judge a build
+  only after rebooting.
+- **We track upstream's pre-release branch** (`future`), whose own changelog promises "new bugs".
 - The `stub` module's namespace is still `org.frknkrc44.stub` (compile-only, never ships).
+
+Pre-existing, but worth fixing:
+
+- **Every build has the same `versionCode` (7304649).** It counts commits on
+  `refs/remotes/origin/master`, which we never update, so module managers and the `updateJson`
+  checker cannot tell our builds apart.
+- **Two long-lived branches.** Fixes made on `feature/fuqp-activity-launch-protection` after the
+  sync do not reach `sync/upstream-future` on their own. Pick one as the main line.
 
 ## Sync log
 
 | Date | Upstream commit | Branch | Notes |
 |---|---|---|---|
-| 2026-10-04 | `16e7276b` (upstream/future) | `sync/upstream-future` | First sync. Base `d1cfcbce`. Brings Android 17 QPR2 support, QPR3 Beta 1 fixes (AndroidVMTools `56dff5b6` via submodule, `ZygoteHook` `ProcessParams` path), installer hooks split into `InstallerHookTarget*`, rikka removal, AGP 9.4.1. 15 conflicts. |
+| 2026-10-04 | `16e7276b` (upstream/future) | `sync/upstream-future` | First sync. Base `d1cfcbce`. Brings Android 17 QPR2 support, QPR3 Beta 1 fixes (AndroidVMTools `56dff5b6` via submodule, `ZygoteHook` `ProcessParams` path), installer hooks split into `InstallerHookTarget*`, rikka removal, AGP 9.4.1. 15 conflicts. The merge commit's claim that upstream deleted `ic_launcher_alt_5` is wrong: it was renamed to `alt_4` and the oversized path came back; fixed in the follow-up commit. |
