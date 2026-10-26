@@ -124,6 +124,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
                 "webViewProtection" -> ConfigManager.webViewProtection
                 "autoProtectEnabled" -> ConfigManager.autoProtect.enabled
                 "autoProtectNotify" -> ConfigManager.autoProtect.notify
+                "autoProtectAllApps" -> ConfigManager.autoProtect.protectAllApps
                 else -> throw IllegalArgumentException("Invalid key: $key")
             }
         }
@@ -171,6 +172,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
                 "webViewProtection" -> ConfigManager.webViewProtection = value
                 "autoProtectEnabled" -> ConfigManager.autoProtect = ConfigManager.autoProtect.also { it.enabled = value }
                 "autoProtectNotify" -> ConfigManager.autoProtect = ConfigManager.autoProtect.also { it.notify = value }
+                "autoProtectAllApps" -> ConfigManager.autoProtect = ConfigManager.autoProtect.also { it.protectAllApps = value }
                 else -> throw IllegalArgumentException("Invalid key: $key")
             }
         }
@@ -598,6 +600,11 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
                 R.string.autoprotect_settings_proxy_apps,
                 lowercase = false,
             ) { it.proxyPackages }
+            configureAutoProtectList(
+                "autoProtectExcluded",
+                R.string.autoprotect_settings_excluded,
+                lowercase = false,
+            ) { it.excludedPackages }
 
             findPreference<Preference>("autoProtectReapply")?.setOnPreferenceClickListener {
                 reapplyAutoProtect()

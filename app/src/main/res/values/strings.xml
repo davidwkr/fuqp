@@ -27,6 +27,10 @@
     <string name="autoprotect_settings_proxy_apps">Detection proxy apps</string>
     <string name="autoprotect_settings_proxy_apps_summary">Apps that run detection checks on behalf of other apps, such as Google Play</string>
     <string name="autoprotect_settings_list_hint">One entry per line</string>
+    <string name="autoprotect_settings_all_apps">Protect all apps</string>
+    <string name="autoprotect_settings_all_apps_summary">Treat every non-system app as sensitive instead of only matched ones. Covers banks from any country, but can break apps that legitimately read the app list or accessibility — add those to the excluded list</string>
+    <string name="autoprotect_settings_excluded">Excluded apps</string>
+    <string name="autoprotect_settings_excluded_summary">Apps to leave untouched (use this to fix anything broken by \"Protect all apps\")</string>
     <string name="autoprotect_settings_reapply">Re-apply to all now</string>
     <string name="autoprotect_settings_reapply_summary">Run auto-protect across all installed apps</string>
     <string name="auto_protect_channel_name">Auto-protect</string>

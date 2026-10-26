@@ -141,6 +141,12 @@
             app:singleLineTitle="false"
             android:title="@string/autoprotect_settings_notify"
             android:summary="@string/autoprotect_settings_notify_summary" />
+        <SwitchPreferenceCompat
+            android:icon="@drawable/outline_shield_24"
+            android:key="autoProtectAllApps"
+            app:singleLineTitle="false"
+            android:title="@string/autoprotect_settings_all_apps"
+            android:summary="@string/autoprotect_settings_all_apps_summary" />
         <Preference
             android:icon="@drawable/outline_edit_24"
             android:key="autoProtectSensitivePackages"
@@ -159,6 +165,12 @@
             app:singleLineTitle="false"
             android:title="@string/autoprotect_settings_proxy_apps"
             android:summary="@string/autoprotect_settings_proxy_apps_summary" />
+        <Preference
+            android:icon="@drawable/outline_edit_24"
+            android:key="autoProtectExcluded"
+            app:singleLineTitle="false"
+            android:title="@string/autoprotect_settings_excluded"
+            android:summary="@string/autoprotect_settings_excluded_summary" />
         <Preference
             android:icon="@drawable/outline_shield_24"
             android:key="autoProtectReapply"

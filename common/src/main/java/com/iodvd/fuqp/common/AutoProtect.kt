@@ -105,8 +105,12 @@ object AutoProtect {
         rules: JsonConfig.AutoProtectConfig,
         isSystem: (String) -> Boolean,
     ): Boolean {
+        // Explicit sensitive wins over everything; explicit exclusion then wins over heuristics.
         if (pkg in rules.sensitivePackages) return true
+        if (pkg in rules.excludedPackages) return false
         if (isSystem(pkg)) return false
+        // Blanket mode: every remaining (non-system, non-excluded) user app counts.
+        if (rules.protectAllApps) return true
         val lower = pkg.lowercase()
         return rules.sensitiveKeywords.any { it in lower }
     }

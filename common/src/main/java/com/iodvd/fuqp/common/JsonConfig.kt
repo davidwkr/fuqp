@@ -127,6 +127,14 @@ data class JsonConfig(
         /** Post a notification summarising each automatic (and manual) run. */
         var notify: Boolean = true,
 
+        /**
+         * Blanket mode: treat EVERY non-system user app as sensitive instead of only
+         * keyword/package matches. Sidesteps having to identify banks per country, but blanket
+         * accessibility/settings spoofing can break legitimate apps, so it is opt-in and paired
+         * with [excludedPackages]. System apps, proxies and [excludedPackages] are never covered.
+         */
+        var protectAllApps: Boolean = false,
+
         /** App-hide presets applied to a sensitive app (names from AppPresets). */
         val appPresets: MutableSet<String> = mutableSetOf(
             "root_apps", "xposed", "detector_apps", "sus_apps", "shizuku_dhizuku",
@@ -175,6 +183,9 @@ data class JsonConfig(
             "com.google.android.gms",
             "com.google.android.gsf",
         ),
+
+        /** Packages to leave untouched, mainly to undo [protectAllApps] breakage. User-extensible. */
+        val excludedPackages: MutableSet<String> = mutableSetOf(),
     ) {
         override fun toString() = encoder.encodeToString(this)
     }

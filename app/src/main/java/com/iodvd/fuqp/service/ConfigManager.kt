@@ -416,7 +416,13 @@ object ConfigManager {
         }
 
         val scopeBefore = merged.scope.keys.toSet()
-        val result = AutoProtect.apply(merged, allPackages, isSystem)
+        // Never auto-protect the manager itself — it must see the real app list (matters once
+        // blanket "protect all apps" mode is on).
+        val result = AutoProtect.apply(
+            merged,
+            allPackages.filterNot { it == com.iodvd.fuqp.BuildConfig.APPLICATION_ID },
+            isSystem,
+        )
 
         // Backstop invariant: the merge only ever adds entries, so the key set must never
         // shrink. If it somehow did, refuse to persist rather than drop a user's config.
