@@ -390,6 +390,7 @@ object ConfigManager {
      */
     fun applyAutoProtect(
         allPackages: List<String>,
+        onlyIfEnabled: Boolean = false,
         isSystem: (String) -> Boolean,
     ): AutoProtectResult? = synchronized(lock) {
         // Merge onto a FRESHLY loaded config, not the shared `config`. If the read fails we
@@ -403,6 +404,10 @@ object ConfigManager {
             log(Log.ERROR, TAG, "applyAutoProtect aborted: live config could not be loaded")
             return@synchronized null
         }
+        // Automatic callers (install/update) pass onlyIfEnabled: respect the user's switch.
+        // The manual one-tap leaves it false so it always runs.
+        if (onlyIfEnabled && !merged.autoProtect.enabled) return@synchronized null
+
         if (!AutoProtect.presetCatalogLoaded) {
             // Proceeding would create empty scope entries that enable hooking with no hide
             // rules. Abort rather than half-apply.

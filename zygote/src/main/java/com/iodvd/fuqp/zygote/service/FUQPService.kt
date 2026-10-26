@@ -28,6 +28,7 @@ import com.iodvd.fuqp.common.Utils.encoder
 import com.iodvd.fuqp.common.Utils.generateRandomString
 import com.iodvd.fuqp.common.Utils.getInstalledApplicationsCompat
 import com.iodvd.fuqp.common.Utils.getPackageInfoCompat
+import com.iodvd.fuqp.common.AutoProtect
 import com.iodvd.fuqp.common.Utils.isSystemApp
 import com.iodvd.fuqp.common.settings_presets.ReplacementItem
 import com.iodvd.fuqp.common.BuildConfig
@@ -581,6 +582,27 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
                     handlePackageAdded(pms, packageName) { preset ->
                         if (dataHolder.addIntoPresetCache(preset, packageName)) {
                             writePresetCache()
+                        }
+                    }
+
+                    // Auto-protect: apply the rule-based anti-detection setup to the newly
+                    // installed/updated app (ACTION_PACKAGE_ADDED also fires for replacements,
+                    // so updates are covered). Idempotent via the shared engine; wrapped so it
+                    // can never crash the package-event path.
+                    if (config.autoProtect.enabled &&
+                        AutoProtect.presetCatalogLoaded &&
+                        packageName != BuildConfig.APP_PACKAGE_NAME
+                    ) {
+                        try {
+                            val result = AutoProtect.apply(config, listOf(packageName)) { pkg ->
+                                pms.getPackageInfo(pkg, 0L, 0)?.applicationInfo?.isSystemApp() ?: false
+                            }
+                            if (result.changed) {
+                                writeConfig(config.toString())
+                                logI(TAG) { "auto-protect: $packageName (${result.sensitive}s/${result.proxy}p)" }
+                            }
+                        } catch (t: Throwable) {
+                            logI(TAG) { "auto-protect failed for $packageName: ${t.message}" }
                         }
                     }
                 }

@@ -101,5 +101,17 @@
             android:authorities="${applicationId}.ServiceProvider"
             android:exported="false" />
 
+        <!-- Automatic Auto-protect: notify + fallback-apply on app install/update.
+             exported so the system can deliver these package broadcasts. -->
+        <receiver
+            android:name="com.iodvd.fuqp.receiver.PackageEventReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
+                <action android:name="android.intent.action.PACKAGE_REPLACED" />
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+
     </application>
 </manifest>
