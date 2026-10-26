@@ -82,6 +82,13 @@ data class JsonConfig(
 
     val ignoredPackagesForPresets: MutableSet<String> = mutableSetOf(),
 
+    /**
+     * Rules for the one-tap "auto-protect" action, which scans every installed app and
+     * configures the sensible anti-detection bundle on the ones that need it. All fields
+     * have defaults, so this is backward compatible with configs written before it existed.
+     */
+    var autoProtect: AutoProtectConfig = AutoProtectConfig(),
+
     val templates: MutableMap<String, Template> = mutableMapOf(),
     val settingsTemplates: MutableMap<String, SettingsTemplate> = mutableMapOf(),
 
@@ -95,6 +102,65 @@ data class JsonConfig(
      */
     val scope: MutableMap<String, AppConfig> = mutableMapOf()
 ) {
+    /**
+     * Customizable rule set driving the one-tap auto-protect.
+     *
+     * The engine classifies each installed app into one of:
+     *  - a **sensitive** app (bank/fintech/payment/wallet/government, or a known detector):
+     *    gets the full bundle - [appPresets] to hide from it, [settingsPresets] to spoof, and
+     *    installation-source masking.
+     *  - a **proxy** app ([proxyPackages], e.g. Google Play / Play Services): gets [settingsPresets]
+     *    only. These apps run detection on behalf of others (the "Close app to continue"
+     *    accessibility prompt is Google Play reading the enabled-accessibility list), so they must
+     *    be covered, but must NOT have their package visibility or install source touched or Play
+     *    itself breaks.
+     *
+     * Classification is by exact package ([sensitivePackages]) or package-name substring
+     * ([sensitiveKeywords]); Android's app category is unreliable (often unset off-Play) and is
+     * deliberately not used.
+     */
+    @Serializable
+    data class AutoProtectConfig(
+        var enabled: Boolean = true,
+
+        /** App-hide presets applied to a sensitive app (names from AppPresets). */
+        val appPresets: MutableSet<String> = mutableSetOf(
+            "root_apps", "xposed", "detector_apps", "sus_apps", "shizuku_dhizuku",
+        ),
+
+        /** Settings presets applied to sensitive apps and to proxies (names from SettingsPresets). */
+        val settingsPresets: MutableSet<String> = mutableSetOf(
+            "accessibility", "dev_options", "input_method",
+        ),
+
+        /** Mask installation source on matched sensitive apps. */
+        var hideInstallationSource: Boolean = true,
+
+        /** Exact package names always treated as sensitive. User-extensible. */
+        val sensitivePackages: MutableSet<String> = mutableSetOf(
+            "com.mercadolibre",
+            "com.mercadopago.wallet",
+            "com.macro.banco.ar",
+        ),
+
+        /** Lowercase package-name substrings that mark an app sensitive. User-extensible. */
+        val sensitiveKeywords: MutableSet<String> = mutableSetOf(
+            "bank", "banco", "bbva", "santander", "galicia", "macro", "brubank", "uala",
+            "wallet", "billetera", "mercadopago", "paypal", "payoneer", "revolut", "wise",
+            "binance", "crypto", "coinbase", "lemon", "belo", "buenbit", "ripio",
+            "upi", "paytm", "phonepe", "finance", "fintech", "gov", "gob",
+        ),
+
+        /** Detection-proxy apps that must also be covered with [settingsPresets] only. */
+        val proxyPackages: MutableSet<String> = mutableSetOf(
+            "com.android.vending",
+            "com.google.android.gms",
+            "com.google.android.gsf",
+        ),
+    ) {
+        override fun toString() = encoder.encodeToString(this)
+    }
+
     @Serializable
     data class Template(
         /**

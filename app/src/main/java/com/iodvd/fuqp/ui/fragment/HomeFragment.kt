@@ -32,8 +32,10 @@ import com.iodvd.fuqp.common.Constants.MANAGER_WORK_MODE_LOADING
 import com.iodvd.fuqp.common.Constants.MANAGER_WORK_MODE_NO_HOOKS
 import com.iodvd.fuqp.common.Constants.MANAGER_WORK_MODE_UNKNOWN
 import com.iodvd.fuqp.data.fetchLatestUpdate
+import com.iodvd.fuqp.service.ConfigManager
 import com.iodvd.fuqp.service.PrefManager
 import com.iodvd.fuqp.service.ServiceClient
+import com.iodvd.fuqp.util.PackageHelper
 import com.iodvd.fuqp.ui.util.ThemeUtils.attrDrawable
 import com.iodvd.fuqp.ui.util.ThemeUtils.getColor
 import com.iodvd.fuqp.ui.util.ThemeUtils.homeItemBackgroundColor
@@ -46,6 +48,7 @@ import com.iodvd.fuqp.ui.util.setupToolbar
 import com.iodvd.fuqp.ui.util.showToast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import com.iodvd.fuqp.BuildConfig
 import com.iodvd.fuqp.R
@@ -198,6 +201,19 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
                                 "\n\n" +
                                 getString(R.string.about_how_to_use_description_3))
                     .setNegativeButton(android.R.string.ok, null)
+                    .show()
+            }
+        }
+
+        with(binding.autoProtect) {
+            text1.text = getString(R.string.title_auto_protect)
+            icon.setImageResource(R.drawable.outline_shield_24)
+            root.setOnClickListener {
+                MaterialAlertDialogBuilder(requireContext())
+                    .setTitle(R.string.auto_protect_dialog_title)
+                    .setMessage(R.string.auto_protect_dialog_message)
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .setPositiveButton(R.string.auto_protect_apply) { _, _ -> runAutoProtect() }
                     .show()
             }
         }
@@ -390,6 +406,7 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
 
         val isHooks = !isNoHooks && isWorking
 
+        binding.autoProtect.root.isVisible = isHooks
         binding.manageApps.root.isVisible = isHooks
         binding.manageTemplates.root.isVisible = isHooks
         binding.managePresets.root.isVisible = isHooks
@@ -397,6 +414,27 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         binding.navLogs.root.isVisible = isWorking
         binding.navSettings.root.isVisible = isWorking
         (binding.backupConfig.parent as ViewGroup).isVisible = isHooks
+    }
+
+    private fun runAutoProtect() {
+        showToast(R.string.auto_protect_running)
+        lifecycleScope.launch {
+            // Refresh the package list and wait for it, so the scan sees every installed app
+            // even if the user has not opened "Manage apps" this session.
+            val packages = suspendCancellableCoroutine { cont ->
+                PackageHelper.invalidateCache {
+                    cont.resumeWith(
+                        Result.success(PackageHelper.appList.replayCache.firstOrNull() ?: emptyList())
+                    )
+                }
+            }
+
+            val result = withContext(Dispatchers.IO) {
+                ConfigManager.applyAutoProtect(packages) { PackageHelper.isSystem(it) }
+            }
+
+            showToast(getString(R.string.auto_protect_result, result.sensitive, result.proxy))
+        }
     }
 
     private fun setStatusIcon(@DrawableRes res: Int) {

@@ -2,9 +2,11 @@ package com.iodvd.fuqp.service
 
 import android.os.Build
 import android.util.Log
+import com.iodvd.fuqp.common.AppPresets
 import com.iodvd.fuqp.common.CollectionUtils.removeIfWithCount
 import com.iodvd.fuqp.common.CollectionUtils.sync
 import com.iodvd.fuqp.common.JsonConfig
+import com.iodvd.fuqp.common.SettingsPresets
 import com.iodvd.fuqp.common.PropertyUtils
 import com.iodvd.fuqp.common.settings_presets.ReplacementItem
 import com.iodvd.fuqp.service.ServiceClient.log
@@ -331,5 +333,80 @@ object ConfigManager {
     fun resetConfig() {
         config = JsonConfig()
         saveConfig()
+    }
+
+    /** Outcome of a one-tap [applyAutoProtect] run. */
+    data class AutoProtectResult(val sensitive: Int, val proxy: Int) {
+        val total get() = sensitive + proxy
+    }
+
+    var autoProtect: JsonConfig.AutoProtectConfig
+        get() = config.autoProtect
+        set(value) {
+            config.autoProtect = value
+            saveConfig()
+        }
+
+    /**
+     * Scans [allPackages] and configures the anti-detection bundle on the apps the rules match,
+     * then saves once. Purely **additive**: existing per-app choices are merged into, never
+     * cleared, so re-running is safe and manual tweaks survive.
+     *
+     * @param isSystem tells a system app from a user app (keyword matches are limited to user
+     *   apps to avoid false positives; explicit [JsonConfig.AutoProtectConfig.sensitivePackages]
+     *   and [JsonConfig.AutoProtectConfig.proxyPackages] still apply to system apps).
+     */
+    fun applyAutoProtect(
+        allPackages: List<String>,
+        isSystem: (String) -> Boolean,
+    ): AutoProtectResult {
+        val rules = config.autoProtect
+
+        // Keep only names the current build actually knows, so a stale/edited rule set cannot
+        // inject preset names that silently do nothing.
+        val validAppPresets = AppPresets.instance.presetNames.toSet()
+        val validSettingsPresets = SettingsPresets.instance.presetNames.toSet()
+        val appPresets = rules.appPresets.filter { it in validAppPresets }
+        val settingsPresets = rules.settingsPresets.filter { it in validSettingsPresets }
+
+        var sensitive = 0
+        var proxy = 0
+        for (pkg in allPackages) {
+            when {
+                pkg in rules.proxyPackages -> {
+                    // Detection proxies (Google Play / Play Services): spoof settings only.
+                    // Never touch their package visibility or install source, or Play breaks.
+                    val appConfig = config.scope.getOrPut(pkg) { JsonConfig.AppConfig() }
+                    appConfig.applySettingsPresets.addAll(settingsPresets)
+                    proxy++
+                }
+
+                isSensitive(pkg, rules, isSystem) -> {
+                    val appConfig = config.scope.getOrPut(pkg) { JsonConfig.AppConfig() }
+                    appConfig.applyPresets.addAll(appPresets)
+                    appConfig.applySettingsPresets.addAll(settingsPresets)
+                    if (rules.hideInstallationSource) {
+                        appConfig.hideInstallationSource = true
+                        appConfig.excludeTargetInstallationSource = true
+                    }
+                    sensitive++
+                }
+            }
+        }
+
+        saveConfig()
+        log(Log.INFO, TAG, "applyAutoProtect: $sensitive sensitive, $proxy proxy")
+        return AutoProtectResult(sensitive, proxy)
+    }
+
+    private fun isSensitive(
+        pkg: String,
+        rules: JsonConfig.AutoProtectConfig,
+        isSystem: (String) -> Boolean,
+    ): Boolean {
+        if (pkg in rules.sensitivePackages) return true
+        if (isSystem(pkg)) return false
+        val lower = pkg.lowercase()
+        return rules.sensitiveKeywords.any { it in lower }
     }
 }

@@ -14,6 +14,10 @@ fun Fragment.showToast(@StringRes resId: Int, duration: Int = Snackbar.LENGTH_SH
     }.show()
 }
 
+fun Fragment.showToast(text: CharSequence, duration: Int = Snackbar.LENGTH_LONG) {
+    Snackbar.make(requireActivity().window.decorView, text, duration).show()
+}
+
 fun Fragment.showNeedRebootToast() = showToast(
     R.string.settings_need_reboot,
     Snackbar.LENGTH_LONG,

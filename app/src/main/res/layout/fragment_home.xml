@@ -48,6 +48,10 @@
                     layout="@layout/view_home_item" />
 
                 <include
+                    android:id="@+id/auto_protect"
+                    layout="@layout/view_home_item" />
+
+                <include
                     android:id="@+id/manage_apps"
                     layout="@layout/view_home_item" />
 

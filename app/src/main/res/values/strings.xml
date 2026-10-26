@@ -9,6 +9,12 @@
     <string name="title_template_settings">Template settings</string>
     <string name="title_settings_template_conf">Settings template configuration</string>
     <string name="title_app_manage">Manage apps</string>
+    <string name="title_auto_protect">Auto-protect</string>
+    <string name="auto_protect_dialog_title">Auto-protect against common detections</string>
+    <string name="auto_protect_dialog_message">Scans every installed app and applies a sensible anti-detection setup automatically:\n\n• Banking, wallet, payment and other sensitive apps get root/Xposed/detector hiding, accessibility / developer-options / input-method spoofing, and installation-source masking.\n\n• Google Play and Play Services are covered too, since they run the accessibility check behind the \"Close app to continue\" prompt on behalf of those apps.\n\nThis only adds protections; your existing per-app settings are kept. You can re-run it any time. Apply now?</string>
+    <string name="auto_protect_apply">Apply</string>
+    <string name="auto_protect_running">Applying auto-protect…</string>
+    <string name="auto_protect_result">Protected %1$d sensitive app(s) and %2$d detection proxy app(s)</string>
     <string name="title_app_select">Select apps</string>
     <string name="title_app_settings">App settings</string>
     <string name="title_about">About</string>
