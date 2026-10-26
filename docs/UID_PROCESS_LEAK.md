@@ -4,9 +4,11 @@ Design notes for closing the one detection vector FUQP's current architecture
 *structurally* cannot reach: a querier learning that a **hidden app's process is alive**
 by probing the kernel directly, independent of PackageManager.
 
-**Status: design only. No code written.** This documents the decision to extend FUQP from
-a system_server-only module into one that also runs in querier processes, and what that
-entails, so the architectural commitment is made deliberately before any of it ships.
+**Status: design only. No code written.** Two approaches are documented: a near-term
+system_server-side **synthetic decoy** behind a toggle (cheaper, reversible, hard ceiling),
+and the complete fix that extends FUQP into querier processes to filter the kernel liveness
+side channels (bigger project). The decoy is the recommended first step, gated on a device
+re-scan; the querier-side plane is the fallback for detectors it cannot satisfy.
 
 ## The leak, concretely
 
@@ -60,11 +62,15 @@ The only framework-layer moves both fail the threat model:
 
 - **Reveal the UID→name** (let `getPackagesForUid` resolve) → removes the mismatch but
   un-hides the app → it finds Xposed. Rejected.
-- **Return a decoy name** → removes the mismatch but a fabricated package is itself a
-  fingerprint, and still signals "something is here." Rejected.
+- **Return a decoy name** → removes the mismatch, and if the decoy is synthesised
+  *coherently* (not just the reverse lookup) it keeps the app hidden. It does **not** make
+  the kernel-side half honest, so it can only ever satisfy detectors that stop at the
+  PackageManager reverse lookup — and it has an unfixable filesystem residual. This is a
+  legitimate *near-term* mitigation with a hard ceiling, not a complete fix; see
+  [Alternative (near-term): system_server-side synthetic decoy](#alternative-near-term-system_server-side-synthetic-decoy).
 
-No framework option keeps the app hidden *and* removes the mismatch. The fix must make the
-kernel-side half lie too, which requires executing in the querier's process.
+The *complete* fix keeps the app hidden *and* removes the mismatch, which requires making
+the kernel-side half lie too — i.e. executing in the querier's process (below).
 
 ## Design: run in the querier process and filter the liveness side channels
 
@@ -160,6 +166,83 @@ The leak needs a **live** process. If `updatelocker` / `nll.helper` do not need 
 during a scan, freezing **and killing** them (not just hiding) removes their UID from
 `getpriority` entirely. Usage workaround, not a FUQP change, and only viable if they can be
 idle during scans.
+
+## Alternative (near-term): system_server-side synthetic decoy
+
+Instead of making the kernel-side half lie (which forces querier-process injection), make
+the **framework-side half stop being empty**: for a configured caller, map each hidden UID
+to a plausible, Play-sourced **decoy package** so the reverse lookup resolves to a normal
+app and the "live UID, no package" mismatch disappears — while the real app stays hidden.
+
+This stays entirely in system_server (no untrusted-process injection, no native hooks,
+reversible), so it is far cheaper and lower-risk than the querier-side plane. Its ceiling is
+real and must be understood before building it.
+
+### Why it is not just "return a decoy name"
+
+FUQP hides by forcing Android's own `AppsFilter.shouldFilterApplication` gate to filter the
+package — which hides it across *every* PackageManager surface at once (that is why all 14
+visibility probes read 0). That gate can only **hide**; a decoy must **synthesise**, which
+is new machinery. A decoy is only safe if it is coherent across every surface a detector can
+cross-check, or it trades a harmless signal for a worse one:
+
+1. **Reverse lookup** — `getPackagesForUid(uid)` / `getNameForUid(uid)` → decoy. This alone
+   removes the specific `getpriority` warning. Easy — a `hookAfter` rewrite of the (now
+   empty) result for that caller.
+2. **Forward lookup must agree.** If the detector then calls `getPackageInfo(decoy)`:
+   - decoy not installed → `NameNotFoundException` → **new, stronger** "UID names a package
+     that doesn't exist" mismatch.
+   - decoy actually installed → it has its own real UID → **one package under two UIDs**
+     contradiction.
+
+   So `getPackageInfo` / `getApplicationInfo` / `getInstalledPackages` /
+   `getInstallerPackageName` (→ `com.android.vending`) / signatures must all be **synthesised
+   coherently** for the decoy, for that caller. A partial job is worse than nothing.
+3. **Filesystem residual — unfixable from here.** The detector also does `Open APK FD`,
+   `Android/data listing`, `native /data/data stat` — `open()`/`stat()` in the *querier's*
+   process against the real disk. system_server cannot intercept them. A detector that
+   escalates from the decoy name to the filesystem finds no `/data/data/<decoy>`, or an APK
+   whose manifest names the real hidden package → contradiction. This is the same wall that
+   pushed the complete fix into the querier's process.
+
+### Net
+
+- **Naive UID-liveness detector** (pairs `getpriority` with the reverse lookup only): decoy
+  defeats it cleanly. Many detectors are this naive.
+- **Thorough detector** (name↔UID uniqueness + `getPackageInfo` + filesystem, e.g. Duck
+  Detector): risks swapping a low-confidence signal it won't act on for a higher-confidence
+  contradiction it might. **Net value is detector-specific and only measurable by re-scan.**
+
+### Design if built
+
+- **Default-off, per-app (per-querier) toggle**, same shape as `spoofAndroidId`
+  (`JsonConfig.AppConfig` flag + auto-protect rule + UI).
+- **Coherent synthetic decoy**, not just the reverse lookup — fake `getPackagesForUid`,
+  `getNameForUid`, `getPackageInfo`, `getApplicationInfo`, `getInstalledPackages` membership,
+  installer → `com.android.vending`, and a present (fake) signature, so there is no
+  forward/reverse or name↔UID mismatch.
+- **Decoy selection:** plausible, Play-sourced, **not actually installed** (avoids the
+  double-UID collision) and **not in common detector bad-lists** (reduces the chance of a
+  filesystem escalation). Stable per hidden-UID (salted, like the android_id mapping) so it
+  does not flicker across queries/reboots. Never collide two hidden UIDs onto one decoy.
+- **Validate per-detector by device re-scan** as an explicit go/no-go: does the `getpriority`
+  warning drop, or does an APK/datadir probe now bite? If it bites, fall back to the
+  querier-side plane above.
+
+### Decoy vs querier-side injection
+
+| | Synthetic decoy (this section) | Querier-side injection (above) |
+|---|---|---|
+| Layer | system_server only | also the querier's process |
+| New risk | low — reversible PMS rewrite | high — untrusted-process injection, native hooks |
+| Effort | moderate (synthesise PMS surfaces) | large (injection + libc/`/proc` hooks + 2-plane consistency) |
+| Defeats naive detectors | yes | yes |
+| Defeats thorough detectors | no (filesystem residual) | yes |
+| Verdict | good near-term, hard ceiling | complete fix, bigger project |
+
+Recommended path: ship the decoy behind a default-off toggle as the near-term mitigation,
+gate acceptance on the Duck Detector re-scan, and keep the querier-side plane as the
+complete fix for detectors the decoy cannot satisfy.
 
 ## References
 
