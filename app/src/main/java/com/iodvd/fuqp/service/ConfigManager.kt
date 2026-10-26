@@ -41,20 +41,42 @@ object ConfigManager {
     data class PresetInfo(val name: String, val type: PTType?, val translation: String)
 
     private const val TAG = "ConfigManager"
+
+    // `config` is mutated from IO (applyAutoProtect) and from the main thread (property
+    // setters, UI reads). `lock` serializes load/save/merge against each other; `@Volatile`
+    // gives readers that snapshot the reference (without the lock) a safe, consistent object.
+    private val lock = Any()
+
+    @Volatile
     private var config = JsonConfig()
 
-    fun init() {
-        try {
-            val rawConfig = ServiceClient.config
-            config = JsonConfig.parse(rawConfig)
-        } catch (_: Throwable) {
-            // ignore the issues
-        }
+    // saveConfig() rewrites the whole on-disk file, so it must never run against a config we
+    // failed to load — that would overwrite every existing entry with defaults. Stays false
+    // until a load actually succeeds, and any save is refused until then.
+    @Volatile
+    private var loadedOk = false
 
-        config.configVersion = BuildConfig.CONFIG_VERSION
+    /** Reads and parses the live config from the service, stamping the current version. Throws on failure. */
+    private fun loadConfigStrict(): JsonConfig =
+        JsonConfig.parse(ServiceClient.config).also { it.configVersion = BuildConfig.CONFIG_VERSION }
+
+    /** Returns true if the live config was successfully read from the service. */
+    fun init(): Boolean = synchronized(lock) {
+        try {
+            config = loadConfigStrict()
+            loadedOk = true
+        } catch (_: Throwable) {
+            // Keep the previous config and loadedOk flag: a transient read failure must not
+            // flip a previously-good state to "safe to overwrite with defaults".
+        }
+        loadedOk
     }
 
-    fun saveConfig() {
+    fun saveConfig(): Unit = synchronized(lock) {
+        if (!loadedOk) {
+            log(Log.ERROR, TAG, "saveConfig refused: config was never loaded; not overwriting on-disk config")
+            return@synchronized
+        }
         ServiceClient.config = config.toString()
     }
 
@@ -342,15 +364,18 @@ object ConfigManager {
 
     var autoProtect: JsonConfig.AutoProtectConfig
         get() = config.autoProtect
-        set(value) {
+        set(value) = synchronized(lock) {
             config.autoProtect = value
             saveConfig()
         }
 
     /**
      * Scans [allPackages] and configures the anti-detection bundle on the apps the rules match,
-     * then saves once. Purely **additive**: existing per-app choices are merged into, never
-     * cleared, so re-running is safe and manual tweaks survive.
+     * then saves once. Purely **additive**: entries for apps this run doesn't match are left
+     * untouched, and matched apps only ever gain presets — nothing is removed. Note this means
+     * a preset the user manually *removed* from a matched app is re-added on the next run.
+     * Loads the live config fresh and aborts (returns null) if it cannot be read, so a failed
+     * load can never cause the whole-file [saveConfig] to overwrite existing entries.
      *
      * @param isSystem tells a system app from a user app (keyword matches are limited to user
      *   apps to avoid false positives; explicit [JsonConfig.AutoProtectConfig.sensitivePackages]
@@ -359,16 +384,34 @@ object ConfigManager {
     fun applyAutoProtect(
         allPackages: List<String>,
         isSystem: (String) -> Boolean,
-    ): AutoProtectResult {
-        val rules = config.autoProtect
+    ): AutoProtectResult? = synchronized(lock) {
+        // Merge onto a FRESHLY loaded config, not the shared `config`. If the read fails we
+        // abort before touching anything — saveConfig() rewrites the whole file, so merging
+        // into an empty/stale config would wipe every existing entry. Building privately and
+        // publishing the reference at the end also means concurrent readers never observe a
+        // half-merged scope.
+        val merged = try {
+            loadConfigStrict()
+        } catch (_: Throwable) {
+            log(Log.ERROR, TAG, "applyAutoProtect aborted: live config could not be loaded")
+            return@synchronized null
+        }
+        val rules = merged.autoProtect
 
         // Keep only names the current build actually knows, so a stale/edited rule set cannot
         // inject preset names that silently do nothing.
         val validAppPresets = AppPresets.instance.presetNames.toSet()
         val validSettingsPresets = SettingsPresets.instance.presetNames.toSet()
+        if (validAppPresets.isEmpty() && validSettingsPresets.isEmpty()) {
+            // Preset catalog not initialized: proceeding would create empty scope entries that
+            // enable hooking with no hide rules. Abort rather than half-apply.
+            log(Log.ERROR, TAG, "applyAutoProtect aborted: preset catalog not loaded")
+            return@synchronized null
+        }
         val appPresets = rules.appPresets.filter { it in validAppPresets }
         val settingsPresets = rules.settingsPresets.filter { it in validSettingsPresets }
 
+        val scopeBefore = merged.scope.keys.toSet()
         var sensitive = 0
         var proxy = 0
         for (pkg in allPackages) {
@@ -376,15 +419,21 @@ object ConfigManager {
                 pkg in rules.proxyPackages -> {
                     // Detection proxies (Google Play / Play Services): spoof settings only.
                     // Never touch their package visibility or install source, or Play breaks.
-                    val appConfig = config.scope.getOrPut(pkg) { JsonConfig.AppConfig() }
-                    appConfig.applySettingsPresets.addAll(settingsPresets)
+                    val appConfig = merged.scope.getOrPut(pkg) { JsonConfig.AppConfig() }
+                    appConfig.applySettingsPresets.addAll(
+                        settingsPresets.filterNot { it in appConfig.applySettingsPresets },
+                    )
                     proxy++
                 }
 
                 isSensitive(pkg, rules, isSystem) -> {
-                    val appConfig = config.scope.getOrPut(pkg) { JsonConfig.AppConfig() }
-                    appConfig.applyPresets.addAll(appPresets)
-                    appConfig.applySettingsPresets.addAll(settingsPresets)
+                    val appConfig = merged.scope.getOrPut(pkg) { JsonConfig.AppConfig() }
+                    appConfig.applyPresets.addAll(
+                        appPresets.filterNot { it in appConfig.applyPresets },
+                    )
+                    appConfig.applySettingsPresets.addAll(
+                        settingsPresets.filterNot { it in appConfig.applySettingsPresets },
+                    )
                     if (rules.hideInstallationSource) {
                         appConfig.hideInstallationSource = true
                         appConfig.excludeTargetInstallationSource = true
@@ -394,9 +443,17 @@ object ConfigManager {
             }
         }
 
+        // Backstop invariant: the merge only ever adds entries, so the key set must never
+        // shrink. If it somehow did, refuse to persist rather than drop a user's config.
+        check(merged.scope.keys.containsAll(scopeBefore)) {
+            "applyAutoProtect would drop existing scope entries; refusing to save"
+        }
+
+        config = merged
+        loadedOk = true
         saveConfig()
         log(Log.INFO, TAG, "applyAutoProtect: $sensitive sensitive, $proxy proxy")
-        return AutoProtectResult(sensitive, proxy)
+        AutoProtectResult(sensitive, proxy)
     }
 
     private fun isSensitive(

@@ -46,10 +46,13 @@ import com.iodvd.fuqp.ui.util.navigate
 import com.iodvd.fuqp.ui.util.setEdge2EdgeFlags
 import com.iodvd.fuqp.ui.util.setupToolbar
 import com.iodvd.fuqp.ui.util.showToast
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import com.iodvd.fuqp.BuildConfig
 import com.iodvd.fuqp.R
 import com.iodvd.fuqp.databinding.FragmentHomeBinding
@@ -416,24 +419,59 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
         (binding.backupConfig.parent as ViewGroup).isVisible = isHooks
     }
 
+    private var autoProtectRunning = false
+
     private fun runAutoProtect() {
+        // Ignore re-taps while a run is in flight — two concurrent runs could interleave.
+        if (autoProtectRunning) return
+        autoProtectRunning = true
         showToast(R.string.auto_protect_running)
-        lifecycleScope.launch {
-            // Refresh the package list and wait for it, so the scan sees every installed app
-            // even if the user has not opened "Manage apps" this session.
-            val packages = suspendCancellableCoroutine { cont ->
-                PackageHelper.invalidateCache {
-                    cont.resumeWith(
-                        Result.success(PackageHelper.appList.replayCache.firstOrNull() ?: emptyList())
-                    )
+        // viewLifecycleOwner scope: tie the work to the view so a stale callback can't touch a
+        // destroyed view, while the config write itself is made non-cancellable below.
+        viewLifecycleOwner.lifecycleScope.launch {
+            try {
+                // Refresh the package list and wait for it, so the scan sees every installed app
+                // even if the user has not opened "Manage apps" this session. Timeout guards
+                // against a dropped callback hanging the action forever; isActive guards against
+                // a double callback resuming twice.
+                val packages = withTimeoutOrNull(PACKAGE_FETCH_TIMEOUT_MS) {
+                    suspendCancellableCoroutine { cont ->
+                        PackageHelper.invalidateCache {
+                            if (cont.isActive) {
+                                cont.resumeWith(
+                                    Result.success(
+                                        PackageHelper.appList.replayCache.firstOrNull() ?: emptyList(),
+                                    ),
+                                )
+                            }
+                        }
+                    }
                 }
-            }
 
-            val result = withContext(Dispatchers.IO) {
-                ConfigManager.applyAutoProtect(packages) { PackageHelper.isSystem(it) }
-            }
+                if (packages.isNullOrEmpty()) {
+                    // No package list -> never run the merge; an empty scan must not reach
+                    // applyAutoProtect (and must not be reported as success).
+                    showToast(R.string.auto_protect_failed)
+                    return@launch
+                }
 
-            showToast(getString(R.string.auto_protect_result, result.sensitive, result.proxy))
+                // NonCancellable so navigating away mid-write can't leave a half-applied config.
+                val result = withContext(Dispatchers.IO + NonCancellable) {
+                    ConfigManager.applyAutoProtect(packages) { PackageHelper.isSystem(it) }
+                }
+
+                if (result == null) {
+                    showToast(R.string.auto_protect_failed)
+                } else {
+                    showToast(getString(R.string.auto_protect_result, result.sensitive, result.proxy))
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Throwable) {
+                showToast(R.string.auto_protect_failed)
+            } finally {
+                autoProtectRunning = false
+            }
         }
     }
 
@@ -508,6 +546,8 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
     }
 
     companion object {
+        private const val PACKAGE_FETCH_TIMEOUT_MS = 20_000L
+
         @JvmStatic
         fun newInstance() = HomeFragment()
     }
