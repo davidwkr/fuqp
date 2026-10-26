@@ -148,6 +148,9 @@ data class JsonConfig(
         /** Mask installation source on matched sensitive apps. */
         var hideInstallationSource: Boolean = true,
 
+        /** Return a fake, per-app-stable ANDROID_ID (SSAID) to matched sensitive apps. */
+        var spoofAndroidId: Boolean = true,
+
         /**
          * Exact package names always treated as sensitive. User-extensible. Seeded with the real
          * apps verified against the device this was built for — several of these are NOT caught by
@@ -271,6 +274,12 @@ data class JsonConfig(
          */
         @Serializable(with = LegacyBoolIntListSerializer::class)
         var restrictedZygotePermissions: List<Int> = listOf(),
+
+        /**
+         * Return a fake, per-app-stable ANDROID_ID (Settings.Secure.android_id) to this app
+         * instead of the real device value — defeats SSAID fingerprinting / reinstall tracking.
+         */
+        var spoofAndroidId: Boolean = false,
 
         /**
          * A list of applied application templates, it has to contain items

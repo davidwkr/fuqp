@@ -125,6 +125,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
                 "autoProtectEnabled" -> ConfigManager.autoProtect.enabled
                 "autoProtectNotify" -> ConfigManager.autoProtect.notify
                 "autoProtectAllApps" -> ConfigManager.autoProtect.protectAllApps
+                "autoProtectSpoofAndroidId" -> ConfigManager.autoProtect.spoofAndroidId
                 else -> throw IllegalArgumentException("Invalid key: $key")
             }
         }
@@ -173,6 +174,7 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
                 "autoProtectEnabled" -> ConfigManager.autoProtect = ConfigManager.autoProtect.also { it.enabled = value }
                 "autoProtectNotify" -> ConfigManager.autoProtect = ConfigManager.autoProtect.also { it.notify = value }
                 "autoProtectAllApps" -> ConfigManager.autoProtect = ConfigManager.autoProtect.also { it.protectAllApps = value }
+                "autoProtectSpoofAndroidId" -> ConfigManager.autoProtect = ConfigManager.autoProtect.also { it.spoofAndroidId = value }
                 else -> throw IllegalArgumentException("Invalid key: $key")
             }
         }

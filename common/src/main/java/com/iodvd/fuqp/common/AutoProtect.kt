@@ -72,7 +72,9 @@ object AutoProtect {
                 }
 
                 isSensitive(pkg, rules, isSystem) -> {
-                    if (appPresets.isEmpty() && settingsPresets.isEmpty() && !rules.hideInstallationSource) continue
+                    if (appPresets.isEmpty() && settingsPresets.isEmpty() &&
+                        !rules.hideInstallationSource && !rules.spoofAndroidId
+                    ) continue
                     val isNew = pkg !in scopeBefore
                     val appConfig = config.scope.getOrPut(pkg) { mutated = true; JsonConfig.AppConfig() }
 
@@ -90,6 +92,11 @@ object AutoProtect {
                     if (rules.hideInstallationSource && isNew) {
                         appConfig.hideInstallationSource = true
                         appConfig.excludeTargetInstallationSource = true
+                    }
+                    // Same policy for SSAID spoofing: set it on first detection only.
+                    if (rules.spoofAndroidId && isNew && !appConfig.spoofAndroidId) {
+                        appConfig.spoofAndroidId = true
+                        mutated = true
                     }
                     if (isNew) newlyProtected += pkg
                     sensitive++

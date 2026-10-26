@@ -22,5 +22,11 @@
             android:summary="@string/app_exclude_target_installation_source_desc"
             app:singleLineTitle="false"
             android:title="@string/app_exclude_target_installation_source" />
+        <SwitchPreferenceCompat
+            android:icon="@drawable/outline_android_24"
+            android:key="spoofAndroidId"
+            android:summary="@string/app_spoof_android_id_desc"
+            app:singleLineTitle="false"
+            android:title="@string/app_spoof_android_id" />
     </PreferenceCategory>
 </PreferenceScreen>

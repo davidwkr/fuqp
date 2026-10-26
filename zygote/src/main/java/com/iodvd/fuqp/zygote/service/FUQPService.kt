@@ -69,12 +69,17 @@ import java.io.File
 import java.lang.reflect.Modifier
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
+import java.security.SecureRandom
 import kotlin.io.path.Path
 
 class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub() {
 
     companion object {
         private const val TAG = "FUQP-Service"
+
+        /** Settings.Secure key for the per-app SSAID we optionally spoof. */
+        private const val ANDROID_ID_SETTING = "android_id"
     }
 
     @Volatile
@@ -354,6 +359,14 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
     fun getSpoofedSetting(caller: String?, name: String?, database: String): ReplacementItem? {
         if (caller == null || name == null) return null
 
+        // Fake ANDROID_ID: a per-(device,caller) stable value, so the app sees a consistent id
+        // that is neither the real device SSAID nor shared with other apps.
+        if (name == ANDROID_ID_SETTING && database == Constants.SETTINGS_SECURE &&
+            config.scope[caller]?.spoofAndroidId == true
+        ) {
+            return ReplacementItem(name, spoofedAndroidId(caller), Constants.SETTINGS_SECURE)
+        }
+
         val templates = getEnabledSettingsTemplates(caller)
         val replacement = config.settingsTemplates.firstNotNullOfOrNull { (key, value) ->
             if (key in templates) value.settingsList.firstOrNull {
@@ -372,6 +385,42 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         }
 
         return null
+    }
+
+    /**
+     * Random salt mixed into every spoofed ANDROID_ID so the fake values can't be reversed to the
+     * caller package or correlated across devices. Persisted next to the config so the spoofed ids
+     * stay stable across reboots/updates (an app that saw a changing android_id would re-register
+     * every launch, which is itself a signal). Regenerated only if the file is missing/corrupt.
+     */
+    private val androidIdSalt: ByteArray by lazy {
+        val saltFile = File(dataDir, "android_id_salt")
+        runCatching {
+            if (saltFile.isFile && saltFile.length() >= 16) return@lazy saltFile.readBytes()
+        }
+        val fresh = ByteArray(32).also { SecureRandom().nextBytes(it) }
+        runCatching {
+            saltFile.writeBytes(fresh)
+            ensureFileIsRW(saltFile, true)
+        }.onFailure {
+            logW(TAG) { "Failed to persist android_id salt: ${it.message}" }
+        }
+        fresh
+    }
+
+    /**
+     * Fake but stable ANDROID_ID for [caller]: first 8 bytes of SHA-256(salt || caller), hex-encoded
+     * to the 16-char lowercase form a real SSAID uses. Distinct per caller, stable per device.
+     */
+    private fun spoofedAndroidId(caller: String): String {
+        val digest = MessageDigest.getInstance("SHA-256").run {
+            update(androidIdSalt)
+            update(caller.toByteArray())
+            digest()
+        }
+        return buildString(16) {
+            for (i in 0 until 8) append("%02x".format(digest[i].toInt() and 0xff))
+        }
     }
 
     fun getEnabledSettingsTemplates(caller: String?) =

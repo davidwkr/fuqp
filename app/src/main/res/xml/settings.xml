@@ -147,6 +147,12 @@
             app:singleLineTitle="false"
             android:title="@string/autoprotect_settings_all_apps"
             android:summary="@string/autoprotect_settings_all_apps_summary" />
+        <SwitchPreferenceCompat
+            android:icon="@drawable/outline_android_24"
+            android:key="autoProtectSpoofAndroidId"
+            app:singleLineTitle="false"
+            android:title="@string/autoprotect_settings_spoof_android_id"
+            android:summary="@string/autoprotect_settings_spoof_android_id_summary" />
         <Preference
             android:icon="@drawable/outline_edit_24"
             android:key="autoProtectSensitivePackages"
