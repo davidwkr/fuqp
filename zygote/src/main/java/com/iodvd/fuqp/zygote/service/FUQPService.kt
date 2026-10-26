@@ -435,6 +435,7 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
 
     private fun refreshDerivedFlags() {
         anyDecoyCaller = config.scope.values.any { it.decoyHiddenUidOwners }
+        decoyAssignments.clear()
     }
 
     /** Whether [caller] is configured to receive decoy names for UIDs it cannot otherwise see. */
@@ -458,14 +459,19 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         "com.soundcloud.android",
     )
 
+    /** uid -> decoy, so the value is stable per boot and never shared across two UIDs. */
+    private val decoyAssignments = java.util.concurrent.ConcurrentHashMap<Int, String>()
+
     /**
      * A stable decoy package name for [uid]: salted so it is neither guessable nor correlatable
-     * across devices, and the same every call so the value does not flicker. Any candidate that is
-     * actually installed (in user 0) is skipped to avoid one package resolving to two UIDs. Null if
-     * every candidate is installed.
+     * across devices, and the same every call so the value does not flicker. Candidates that are
+     * actually installed, or already handed to another UID, are skipped — a package resolving to two
+     * UIDs is itself a contradiction a detector could catch. Null if no free candidate remains.
      */
     fun decoyPackageForUid(uid: Int): String? {
+        decoyAssignments[uid]?.let { return it }
         if (decoyPackages.isEmpty()) return null
+
         val digest = MessageDigest.getInstance("SHA-256").run {
             update(androidIdSalt)
             update(
@@ -476,14 +482,23 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
             digest()
         }
         val start = ((digest[0].toInt() and 0xff) shl 8) or (digest[1].toInt() and 0xff)
-        for (i in decoyPackages.indices) {
-            val candidate = decoyPackages[(start + i) % decoyPackages.size]
-            val installed = runCatching {
-                binderLocalScope { pms.getPackageUidCompat(candidate, 0L, 0) }
-            }.getOrDefault(-1)
-            if (installed < 0) return candidate
+
+        synchronized(decoyAssignments) {
+            decoyAssignments[uid]?.let { return it }
+            val taken = decoyAssignments.values.toHashSet()
+            for (i in decoyPackages.indices) {
+                val candidate = decoyPackages[(start + i) % decoyPackages.size]
+                if (candidate in taken) continue
+                val installed = runCatching {
+                    binderLocalScope { pms.getPackageUidCompat(candidate, 0L, 0) }
+                }.getOrDefault(-1)
+                if (installed < 0) {
+                    decoyAssignments[uid] = candidate
+                    return candidate
+                }
+            }
+            return null
         }
-        return null
     }
 
     fun getEnabledSettingsTemplates(caller: String?) =
