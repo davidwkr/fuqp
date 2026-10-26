@@ -140,11 +140,22 @@ data class JsonConfig(
         /** Mask installation source on matched sensitive apps. */
         var hideInstallationSource: Boolean = true,
 
-        /** Exact package names always treated as sensitive. User-extensible. */
+        /**
+         * Exact package names always treated as sensitive. User-extensible. Seeded with the real
+         * apps verified against the device this was built for — several of these are NOT caught by
+         * the keyword net (no "banco"/"pago" token), so they must be listed explicitly.
+         */
         val sensitivePackages: MutableSet<String> = mutableSetOf(
             "com.mercadolibre",
             "com.mercadopago.wallet",
             "com.macro.banco.ar",
+            "com.ar.claropay.app",
+            "com.hipotecario.mobile",
+            "com.pluspagos.mobile",
+            "ar.com.redlink.custom",
+            "ar.com.paretopago",
+            "com.playdigital.modo",
+            "ar.com.comafi.app.hbi.prod",
         ),
 
         /** Lowercase package-name substrings that mark an app sensitive. User-extensible. */
@@ -153,6 +164,9 @@ data class JsonConfig(
             "wallet", "billetera", "mercadopago", "paypal", "payoneer", "revolut", "wise",
             "binance", "crypto", "coinbase", "lemon", "belo", "buenbit", "ripio",
             "upi", "paytm", "phonepe", "finance", "fintech", "gov", "gob",
+            // Argentine fintech/bank tokens (unambiguous enough to generalise to future installs)
+            "pago", "pagos", "hipotecario", "comafi", "redlink", "supervielle",
+            "credicoop", "claropay", "cuentadni", "personalpay", "naranjax",
         ),
 
         /** Detection-proxy apps that must also be covered with [settingsPresets] only. */
