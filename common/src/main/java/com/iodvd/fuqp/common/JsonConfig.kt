@@ -265,8 +265,11 @@ data class JsonConfig(
         var excludeVoldIsolation: Boolean = false,
 
         /**
-         * A list of removed Zygote permissions while the app was launching
+         * A list of removed Zygote permissions while the app was launching.
+         * Tolerates a legacy boolean value from older/hand-edited configs so one stale entry
+         * can't make the whole config unparseable (which silently disables protection).
          */
+        @Serializable(with = LegacyBoolIntListSerializer::class)
         var restrictedZygotePermissions: List<Int> = listOf(),
 
         /**
