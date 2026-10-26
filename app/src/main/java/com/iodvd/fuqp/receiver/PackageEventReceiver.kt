@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
+import android.util.Log
 import com.iodvd.fuqp.service.ConfigManager
 import com.iodvd.fuqp.ui.util.AutoProtectNotifier
 
@@ -37,8 +38,10 @@ class PackageEventReceiver : BroadcastReceiver() {
                 if (result.total > 0 && ConfigManager.autoProtect.notify) {
                     AutoProtectNotifier.notifyResult(appContext, result)
                 }
-            } catch (_: Throwable) {
-                // A package broadcast must never crash the manager.
+            } catch (t: Throwable) {
+                // A package broadcast must never crash the manager, but a swallowed invariant
+                // failure (e.g. the scope-superset check) is exactly what we want to see.
+                Log.w("FUQP-AutoProtect", "receiver apply failed for $pkg", t)
             } finally {
                 pending.finish()
             }

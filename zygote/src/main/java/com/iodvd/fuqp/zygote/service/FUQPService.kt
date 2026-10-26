@@ -586,20 +586,26 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
                     }
 
                     // Auto-protect: apply the rule-based anti-detection setup to the newly
-                    // installed/updated app (ACTION_PACKAGE_ADDED also fires for replacements,
-                    // so updates are covered). Idempotent via the shared engine; wrapped so it
-                    // can never crash the package-event path.
-                    if (config.autoProtect.enabled &&
-                        AutoProtect.presetCatalogLoaded &&
-                        packageName != BuildConfig.APP_PACKAGE_NAME
-                    ) {
+                    // installed/updated app (ACTION_PACKAGE_ADDED fires for replacements too, so
+                    // updates are covered). Everything is inside the try, and we read the config
+                    // FRESH from disk and apply to that private copy — never the live `config`
+                    // other system_server threads read — then let writeConfig publish it
+                    // atomically. Reading fresh also means a missing/unreadable config aborts
+                    // instead of being overwritten with defaults.
+                    if (packageName != BuildConfig.APP_PACKAGE_NAME) {
                         try {
-                            val result = AutoProtect.apply(config, listOf(packageName)) { pkg ->
-                                pms.getPackageInfo(pkg, 0L, 0)?.applicationInfo?.isSystemApp() ?: false
-                            }
-                            if (result.changed) {
-                                writeConfig(config.toString())
-                                logI(TAG) { "auto-protect: $packageName (${result.sensitive}s/${result.proxy}p)" }
+                            val working = JsonConfig.parse(configFile.readText())
+                            if (working.autoProtect.enabled &&
+                                working.configVersion == BuildConfig.CONFIG_VERSION &&
+                                AutoProtect.presetCatalogLoaded
+                            ) {
+                                val result = AutoProtect.apply(working, listOf(packageName)) { pkg ->
+                                    pms.getPackageInfoCompat(pkg, 0L, 0)?.applicationInfo?.isSystemApp() ?: false
+                                }
+                                if (result.mutated) {
+                                    writeConfig(working.toString())
+                                    logI(TAG) { "auto-protect: $packageName (${result.sensitive}s/${result.proxy}p)" }
+                                }
                             }
                         } catch (t: Throwable) {
                             logI(TAG) { "auto-protect failed for $packageName: ${t.message}" }

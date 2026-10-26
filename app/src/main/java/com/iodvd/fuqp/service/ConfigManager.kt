@@ -426,7 +426,7 @@ object ConfigManager {
 
         config = merged
         loadedOk = true
-        saveConfig()
+        if (result.mutated) saveConfig()
         log(Log.INFO, TAG, "applyAutoProtect: ${result.sensitive} sensitive, ${result.proxy} proxy, ${result.newlyProtected.size} new")
         AutoProtectResult(result.sensitive, result.proxy, result.newlyProtected)
     }
