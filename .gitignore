@@ -92,3 +92,6 @@ xposed/
 # local coding-agent state (the live .claude_audit.log is already covered by *.log)
 .claude_project_auto_accept
 .claude_audit.log.*
+
+# Local distribution artifacts
+dist/

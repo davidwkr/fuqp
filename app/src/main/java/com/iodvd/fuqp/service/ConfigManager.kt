@@ -2,11 +2,10 @@ package com.iodvd.fuqp.service
 
 import android.os.Build
 import android.util.Log
-import com.iodvd.fuqp.common.AppPresets
+import com.iodvd.fuqp.common.AutoProtect
 import com.iodvd.fuqp.common.CollectionUtils.removeIfWithCount
 import com.iodvd.fuqp.common.CollectionUtils.sync
 import com.iodvd.fuqp.common.JsonConfig
-import com.iodvd.fuqp.common.SettingsPresets
 import com.iodvd.fuqp.common.PropertyUtils
 import com.iodvd.fuqp.common.settings_presets.ReplacementItem
 import com.iodvd.fuqp.service.ServiceClient.log
@@ -357,8 +356,16 @@ object ConfigManager {
         saveConfig()
     }
 
-    /** Outcome of a one-tap [applyAutoProtect] run. */
-    data class AutoProtectResult(val sensitive: Int, val proxy: Int) {
+    /**
+     * Outcome of a one-tap [applyAutoProtect] run. [newlyProtected] lists the packages that had
+     * no scope entry before this run (i.e. newly detected and configured), so the caller can
+     * report what actually changed rather than just totals.
+     */
+    data class AutoProtectResult(
+        val sensitive: Int,
+        val proxy: Int,
+        val newlyProtected: List<String> = emptyList(),
+    ) {
         val total get() = sensitive + proxy
     }
 
@@ -396,52 +403,15 @@ object ConfigManager {
             log(Log.ERROR, TAG, "applyAutoProtect aborted: live config could not be loaded")
             return@synchronized null
         }
-        val rules = merged.autoProtect
-
-        // Keep only names the current build actually knows, so a stale/edited rule set cannot
-        // inject preset names that silently do nothing.
-        val validAppPresets = AppPresets.instance.presetNames.toSet()
-        val validSettingsPresets = SettingsPresets.instance.presetNames.toSet()
-        if (validAppPresets.isEmpty() && validSettingsPresets.isEmpty()) {
-            // Preset catalog not initialized: proceeding would create empty scope entries that
-            // enable hooking with no hide rules. Abort rather than half-apply.
+        if (!AutoProtect.presetCatalogLoaded) {
+            // Proceeding would create empty scope entries that enable hooking with no hide
+            // rules. Abort rather than half-apply.
             log(Log.ERROR, TAG, "applyAutoProtect aborted: preset catalog not loaded")
             return@synchronized null
         }
-        val appPresets = rules.appPresets.filter { it in validAppPresets }
-        val settingsPresets = rules.settingsPresets.filter { it in validSettingsPresets }
 
         val scopeBefore = merged.scope.keys.toSet()
-        var sensitive = 0
-        var proxy = 0
-        for (pkg in allPackages) {
-            when {
-                pkg in rules.proxyPackages -> {
-                    // Detection proxies (Google Play / Play Services): spoof settings only.
-                    // Never touch their package visibility or install source, or Play breaks.
-                    val appConfig = merged.scope.getOrPut(pkg) { JsonConfig.AppConfig() }
-                    appConfig.applySettingsPresets.addAll(
-                        settingsPresets.filterNot { it in appConfig.applySettingsPresets },
-                    )
-                    proxy++
-                }
-
-                isSensitive(pkg, rules, isSystem) -> {
-                    val appConfig = merged.scope.getOrPut(pkg) { JsonConfig.AppConfig() }
-                    appConfig.applyPresets.addAll(
-                        appPresets.filterNot { it in appConfig.applyPresets },
-                    )
-                    appConfig.applySettingsPresets.addAll(
-                        settingsPresets.filterNot { it in appConfig.applySettingsPresets },
-                    )
-                    if (rules.hideInstallationSource) {
-                        appConfig.hideInstallationSource = true
-                        appConfig.excludeTargetInstallationSource = true
-                    }
-                    sensitive++
-                }
-            }
-        }
+        val result = AutoProtect.apply(merged, allPackages, isSystem)
 
         // Backstop invariant: the merge only ever adds entries, so the key set must never
         // shrink. If it somehow did, refuse to persist rather than drop a user's config.
@@ -452,18 +422,7 @@ object ConfigManager {
         config = merged
         loadedOk = true
         saveConfig()
-        log(Log.INFO, TAG, "applyAutoProtect: $sensitive sensitive, $proxy proxy")
-        AutoProtectResult(sensitive, proxy)
-    }
-
-    private fun isSensitive(
-        pkg: String,
-        rules: JsonConfig.AutoProtectConfig,
-        isSystem: (String) -> Boolean,
-    ): Boolean {
-        if (pkg in rules.sensitivePackages) return true
-        if (isSystem(pkg)) return false
-        val lower = pkg.lowercase()
-        return rules.sensitiveKeywords.any { it in lower }
+        log(Log.INFO, TAG, "applyAutoProtect: ${result.sensitive} sensitive, ${result.proxy} proxy, ${result.newlyProtected.size} new")
+        AutoProtectResult(result.sensitive, result.proxy, result.newlyProtected)
     }
 }

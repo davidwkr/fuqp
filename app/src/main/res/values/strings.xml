@@ -16,6 +16,12 @@
     <string name="auto_protect_running">Applying auto-protect…</string>
     <string name="auto_protect_result">Protected %1$d sensitive app(s) and %2$d detection proxy app(s)</string>
     <string name="auto_protect_failed">Couldn\'t read the current config — nothing changed</string>
+    <string name="auto_protect_channel_name">Auto-protect</string>
+    <string name="auto_protect_channel_desc">Results of automatic anti-detection setup</string>
+    <plurals name="auto_protect_notif_new">
+        <item quantity="one">%d newly detected app:</item>
+        <item quantity="other">%d newly detected apps:</item>
+    </plurals>
     <string name="title_app_select">Select apps</string>
     <string name="title_app_settings">App settings</string>
     <string name="title_about">About</string>

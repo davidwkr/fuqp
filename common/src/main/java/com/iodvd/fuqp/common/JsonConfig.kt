@@ -121,7 +121,11 @@ data class JsonConfig(
      */
     @Serializable
     data class AutoProtectConfig(
+        /** Master switch for applying automatically when an app is installed or updated. */
         var enabled: Boolean = true,
+
+        /** Post a notification summarising each automatic (and manual) run. */
+        var notify: Boolean = true,
 
         /** App-hide presets applied to a sensitive app (names from AppPresets). */
         val appPresets: MutableSet<String> = mutableSetOf(

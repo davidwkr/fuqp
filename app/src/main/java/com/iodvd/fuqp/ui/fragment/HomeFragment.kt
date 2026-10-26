@@ -15,8 +15,14 @@ import android.widget.Chronometer
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import com.iodvd.fuqp.ui.util.AutoProtectNotifier
 import androidx.core.view.isVisible
 import androidx.core.widget.TextViewCompat
 import androidx.fragment.app.Fragment
@@ -65,6 +71,16 @@ import kotlin.concurrent.thread
  */
 class HomeFragment : Fragment(R.layout.fragment_home) {
     private val binding by viewBinding(FragmentHomeBinding::bind)
+
+    // Auto-protect result notification: on Android 13+ the notification needs a runtime grant.
+    // We keep the pending post and fire it once the user answers, so a first-time grant still
+    // produces the notification for the run that triggered the request.
+    private var pendingNotification: (() -> Unit)? = null
+    private val notificationPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) pendingNotification?.invoke()
+            pendingNotification = null
+        }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         with(binding.toolbar) {
@@ -462,8 +478,10 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
 
                 if (result == null) {
                     showToast(R.string.auto_protect_failed)
+                    postAutoProtectNotification { AutoProtectNotifier.notifyFailure(requireContext().applicationContext) }
                 } else {
                     showToast(getString(R.string.auto_protect_result, result.sensitive, result.proxy))
+                    postAutoProtectNotification { AutoProtectNotifier.notifyResult(requireContext().applicationContext, result) }
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -472,6 +490,25 @@ class HomeFragment : Fragment(R.layout.fragment_home) {
             } finally {
                 autoProtectRunning = false
             }
+        }
+    }
+
+    /**
+     * Posts [post] now if notifications can be shown, otherwise requests POST_NOTIFICATIONS
+     * (Android 13+) and fires it on grant. Uses the application context so the notification
+     * outlives this fragment.
+     */
+    private fun postAutoProtectNotification(post: () -> Unit) {
+        val needsRuntimeGrant = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.POST_NOTIFICATIONS,
+            ) != PackageManager.PERMISSION_GRANTED
+        if (needsRuntimeGrant) {
+            pendingNotification = post
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            post()
         }
     }
 

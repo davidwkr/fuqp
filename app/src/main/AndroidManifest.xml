@@ -19,6 +19,9 @@
     <!-- This permission is used for uninstalling the conflicted packages -->
     <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
 
+    <!-- Used to post the Auto-protect result notification (runtime-requested on Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:name="com.iodvd.fuqp.MyApp"
         android:allowBackup="true"
