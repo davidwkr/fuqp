@@ -6,6 +6,7 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.IPackageManager
 import android.os.Build
 import android.os.Bundle
+import android.os.FileObserver
 import android.os.ParcelFileDescriptor
 import android.os.RemoteException
 import android.provider.Settings
@@ -47,6 +48,7 @@ import com.iodvd.fuqp.zygote.hook.PmsHookTarget31
 import com.iodvd.fuqp.zygote.hook.PmsHookTarget33
 import com.iodvd.fuqp.zygote.hook.PmsHookTarget34
 import com.iodvd.fuqp.zygote.hook.PmsPackageEventsHook
+import com.iodvd.fuqp.zygote.hook.UsageStatsHook
 import com.iodvd.fuqp.zygote.hook.ZygoteHook
 import com.iodvd.fuqp.zygote.util.ActivityManagerUtils
 import com.iodvd.fuqp.zygote.util.BrowserUtils.getDefaultBrowser
@@ -91,6 +93,9 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
     private lateinit var oldLogFile: File
     private lateinit var moduleStatusFile: File
 
+    private lateinit var configFileListener: FileObserver
+    private var writtenByManager = false
+
     private val configLock = Any()
     private val loggerLock = Any()
     val systemApps = mutableSetOf<String>()
@@ -113,7 +118,7 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         saveModuleStatus()
         UserService.service = this
         loadFilterCount()
-        loadConfig()
+        reloadConfigFromFile()
 
         appUid = findAndVerifyAppSignature(pms)
 
@@ -127,6 +132,18 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
                     logWithLevel(level, "AppPresets", msg = msg)
                 }
                 loadPresetCache()
+
+                configFileListener = object : FileObserver(configFile, CLOSE_WRITE or ATTRIB) {
+                    override fun onEvent(event: Int, path: String?) {
+                        if (writtenByManager) {
+                            writtenByManager = false
+                            return
+                        }
+
+                        reloadConfigFromFile()
+                    }
+                }
+                configFileListener.startWatching()
 
                 managerWorkMode = Constants.MANAGER_WORK_MODE_OK
             }
@@ -174,6 +191,15 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         oldLogFile = File(logDir, "old.log")
         moduleStatusFile = File(dataDir, "status.json")
 
+        // remove the old filter count
+        File("$dataDir/filter_count").also {
+            try {
+                if (it.exists()) it.delete()
+            } catch (cause: Throwable) {
+                logW(TAG, cause) { "Failed to delete filter count, skip it" }
+            }
+        }
+
         clearLogs()
 
         logcatAvailable = true
@@ -203,43 +229,6 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         } catch (cause: Throwable) {
             logE(TAG, cause) { "An error occurred while writing the status JSON" }
         }
-    }
-
-    private fun loadConfig() {
-        // remove the old filter count
-        File("$dataDir/filter_count").also {
-            try {
-                if (it.exists()) it.delete()
-            } catch (cause: Throwable) {
-                logW(TAG, cause) { "Failed to delete filter count, skip it" }
-            }
-        }
-
-        if (!configFile.exists()) {
-            logI(TAG) { "Config file not found" }
-            return
-        }
-
-        val loading = try {
-            val json = configFile.readText()
-            JsonConfig.parse(json)
-        } catch (cause: Throwable) {
-            logW(TAG, cause) { "Failed to parse config json, skip it" }
-
-            config
-        }
-
-        if (loading.configVersion != BuildConfig.CONFIG_VERSION) {
-            logW(TAG) { "Config version mismatch, need to reload" }
-            return
-        }
-
-        if (config != loading) {
-            loading.cleanRemnantsFromConfig()
-            config = loading
-        }
-
-        logI(TAG) { "Config loaded" }
     }
 
     private fun loadFilterCount() {
@@ -322,6 +311,7 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         frameworkHooks.add(ContentProviderHook())
         frameworkHooks.add(ImmHook())
         frameworkHooks.add(ZygoteHook())
+        frameworkHooks.add(UsageStatsHook())
 
         frameworkHooks.forEach(IFrameworkHook::load)
         logI(TAG) { "Hooks installed" }
@@ -415,9 +405,7 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         for (tplName in appConfig.applyTemplates) {
             val tpl = config.templates[tplName] ?: continue
             if (query in tpl.appList) {
-                if (isAppInGMSIgnoredPackages(caller, query)) return false
-
-                return !appConfig.useWhitelist
+                return !isAppInGMSIgnoredPackages(caller, query) && !appConfig.useWhitelist
             }
         }
 
@@ -446,15 +434,11 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
 
     fun shouldHideActivityLaunch(caller: String?, query: String?, userId: Int): Boolean {
         val appConfig = config.scope[caller]
-        if (appConfig != null && shouldHide(caller, query, userId)) {
-            return if (appConfig.invertActivityLaunchProtection) {
-                config.disableActivityLaunchProtection
-            } else {
-                !config.disableActivityLaunchProtection
-            }
+        return appConfig != null && shouldHide(caller, query, userId) && if (appConfig.invertActivityLaunchProtection) {
+            config.disableActivityLaunchProtection
+        } else {
+            !config.disableActivityLaunchProtection
         }
-
-        return false
     }
 
     fun shouldHideInstallationSource(caller: String?, query: String?, callingUser: Int): Int {
@@ -507,6 +491,8 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
     fun writeConfig(json: String) {
         if (!ensureManagerWorkModeOK()) return
 
+        writtenByManager = true
+
         synchronized(configLock) {
             try {
                 val newConfig = JsonConfig.parse(json)
@@ -530,6 +516,8 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         }
 
         writeFilterCount(true)
+
+        writtenByManager = false
     }
 
     private fun writeFilterCount(force: Boolean = false) {
@@ -550,7 +538,7 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         }
     }
 
-    override fun getServiceVersion() = BuildConfig.SERVICE_VERSION
+    override fun getServiceVersion() = BuildConfig.APP_VERSION_CODE
 
     override fun getFilterCount() = dataHolder.filterHolder.totalCount
 
@@ -721,12 +709,12 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         val hookList = mutableListOf<String>()
 
         for ((className, hookElements) in hooker.hooks) {
-            for (element in hookElements) {
+            for ((_, methodName, _, _, _, argumentCount) in hookElements) {
                 hookList.add(
                     JsonConfig.HookItem(
                         className,
-                        element.methodName,
-                        element.argumentCount,
+                        methodName,
+                        argumentCount,
                     ).toString()
                 )
             }
@@ -802,16 +790,33 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
     }
 
     override fun reloadConfigFromFile() {
-        val loading = runCatching {
-            assert(configFile.exists())
-            val json = configFile.readText()
-            JsonConfig.parse(json)
-        }.getOrElse {
-            logE(TAG, it) { "Failed to parse config.json" }
+        if (!configFile.exists()) {
+            logI(TAG) { "Config file not found" }
             return
         }
 
-        config = loading
+        val loading = try {
+            ensureFileIsRW(configFile, true)
+            val json = configFile.readText()
+            JsonConfig.parse(json)
+        } catch (cause: Throwable) {
+            logW(TAG, cause) { "Failed to parse config json, skip it" }
+
+            config
+        }
+
+        if (loading.configVersion != BuildConfig.CONFIG_VERSION) {
+            logW(TAG) { "Config version mismatched, trying to change it" }
+
+            loading.configVersion = BuildConfig.CONFIG_VERSION
+        }
+
+        if (config != loading) {
+            loading.cleanRemnantsFromConfig()
+            config = loading
+        }
+
+        logI(TAG) { "Config loaded" }
     }
 
     override fun getUserProfiles() = binderLocalScope { UserManagerUtils.userIds }

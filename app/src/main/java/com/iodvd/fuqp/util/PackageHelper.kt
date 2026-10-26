@@ -6,11 +6,11 @@ import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
-import android.os.Binder
 import android.util.Log
 import androidx.core.content.res.ResourcesCompat
 import com.iodvd.fuqp.MyApp.Companion.fuqpApp
 import com.iodvd.fuqp.common.Constants
+import com.iodvd.fuqp.common.Utils.getCallingUser
 import com.iodvd.fuqp.service.PrefManager
 import com.iodvd.fuqp.service.ServiceClient
 import com.iodvd.fuqp.ui.util.ThemeUtils.asDrawable
@@ -93,7 +93,7 @@ object PackageHelper {
             val cache = withContext(Dispatchers.IO) {
                 val pm = fuqpApp.packageManager
                 val profiles = ServiceClient.userProfiles
-                    ?: intArrayOf(Binder.getCallingUserHandle().hashCode())
+                    ?: intArrayOf(getCallingUser())
 
                 mutableMapOf<String, PackageCache>().also { cacheMap ->
                     for (userProfile: Int in profiles) {

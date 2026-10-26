@@ -3,7 +3,7 @@ package com.iodvd.fuqp.zygote.hook
 import android.os.Binder
 import android.os.Build
 import androidx.annotation.RequiresApi
-import com.iodvd.fuqp.common.CollectionUtils.firstOrNullWithType
+import com.iodvd.fuqp.zygote.util.CollectionUtils.firstOrNullWithType
 import com.iodvd.fuqp.common.OSUtils
 import com.iodvd.fuqp.common.Utils
 import com.iodvd.fuqp.zygote.util.Logcat.logI

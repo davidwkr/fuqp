@@ -1,18 +1,17 @@
 package com.iodvd.fuqp.zygote.hook
 
 import android.content.ComponentName
-import android.content.IIntentReceiver
 import android.content.Intent
 import android.os.Build
-import android.os.Bundle
 import com.v7878.unsafe.invoke.EmulatedStackFrame
-import com.iodvd.fuqp.common.CollectionUtils.firstOrNullWithType
+import com.iodvd.fuqp.common.Utils.generateRandomHex
+import com.iodvd.fuqp.common.BuildConfig
 import com.iodvd.fuqp.zygote.service.ReturnValue
+import com.iodvd.fuqp.zygote.util.CollectionUtils.firstOrNullWithType
 import com.iodvd.fuqp.zygote.util.Logcat.logD
 import com.iodvd.fuqp.zygote.util.Logcat.logI
 import com.iodvd.fuqp.zygote.util.ZLUtils.args
 import com.iodvd.fuqp.zygote.util.ZLUtils.getArgument
-import com.iodvd.fuqp.zygote.util.ZLUtils.getBooleanField
 import com.iodvd.fuqp.zygote.util.ZLUtils.getIntField
 import com.iodvd.fuqp.zygote.util.ZLUtils.getObjectField
 import com.iodvd.fuqp.zygote.util.ZygoteConstants.ACTION_USB_STATE
@@ -80,9 +79,9 @@ class BroadcastHook : IFrameworkHook {
     private fun enqueueBroadcastLocked(
         methodName: String,
         frame: EmulatedStackFrame,
-        returnValue: ReturnValue,
+        @Suppress("unused") returnValue: ReturnValue,
     ) {
-        val record = frame.getArgument(1)
+        val record = frame.getArgument(1) ?: return
         val caller = getObjectField(record, "callerPackage") as? String ?: return
         val component = getObjectField(record, "targetComp") as? ComponentName ?: return
         val targetApp = component.packageName
@@ -90,25 +89,10 @@ class BroadcastHook : IFrameworkHook {
 
         if (service.shouldHideActivityLaunch(caller, targetApp, userId)) {
             logD(TAG) { "@$methodName: insecure query from $caller, target: $component" }
-            returnValue.result = null
 
-            val resultTo = getObjectField(record, "resultTo") as? IIntentReceiver
-            val haveATarget = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                true // getObjectField(record, "callerApp") != null
-            } else {
-                getObjectField(record, "resultToApp") != null
-            }
-
-            if (resultTo != null && haveATarget) {
-                resultTo.performReceive(
-                    getObjectField(record, "intent") as Intent,
-                    getIntField(record, "resultCode"),
-                    getObjectField(record, "resultData") as? String,
-                    getObjectField(record, "resultExtras") as? Bundle,
-                    getBooleanField(record, "ordered"),
-                    getBooleanField(record, "sticky"),
-                    userId,
-                )
+            (getObjectField(record, "intent") as Intent).apply {
+                this.component = null
+                this.`package` = "${BuildConfig.APP_PACKAGE_NAME}.${generateRandomHex(4)}"
             }
 
             service.increaseALFilterCount(caller)

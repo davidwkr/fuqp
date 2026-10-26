@@ -4,11 +4,11 @@ import android.content.pm.PackageInstaller
 import android.os.Binder
 import android.os.Build
 import androidx.annotation.RequiresApi
-import com.iodvd.fuqp.common.CollectionUtils.firstOrNullWithType
-import com.iodvd.fuqp.common.CollectionUtils.lastWithType
 import com.iodvd.fuqp.common.Constants.FAKE_INSTALLATION_SOURCE_SYSTEM
 import com.iodvd.fuqp.common.Constants.FAKE_INSTALLATION_SOURCE_USER
 import com.iodvd.fuqp.common.Constants.VENDING_PACKAGE_NAME
+import com.iodvd.fuqp.zygote.util.CollectionUtils.firstOrNullWithType
+import com.iodvd.fuqp.zygote.util.CollectionUtils.lastWithType
 import com.iodvd.fuqp.zygote.util.ZLUtils.args
 import com.iodvd.fuqp.zygote.util.ZLUtils.callMethod
 import com.iodvd.fuqp.zygote.util.ZLUtils.findConstructor
@@ -55,13 +55,14 @@ open class InstallerHookTarget33 : InstallerHookTargetBase() {
                 COMPUTER_ENGINE_CLASS,
                 "isCallerInstallerOfRecord",
             ) { methodName, frame, returnValue ->
-                val callingUid = frame.args.lastWithType<Int>()
+                val args = frame.args
+                val callingUid = args.lastWithType<Int>()
 
                 applyInstallerHiding(
                     methodName,
                     callingUid,
                     fta@{
-                        val pkg = frame.args.lastOrNull {
+                        val pkg = args.lastOrNull {
                             it?.javaClass?.simpleName in androidPkgClazzNames
                         } ?: return@fta null
                         callMethod(pkg,

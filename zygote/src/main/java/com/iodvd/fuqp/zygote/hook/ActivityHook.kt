@@ -11,7 +11,6 @@ import com.v7878.unsafe.invoke.EmulatedStackFrame
 import com.iodvd.fuqp.common.Constants
 import com.iodvd.fuqp.common.Utils.getPackageName
 import com.iodvd.fuqp.common.Utils.getUserFromCallingUid
-import com.iodvd.fuqp.zygote.service.BulkHooker
 import com.iodvd.fuqp.zygote.service.ReturnValue
 import com.iodvd.fuqp.zygote.service.SystemServerHook
 import com.iodvd.fuqp.zygote.util.Logcat.logD
@@ -23,6 +22,7 @@ import com.iodvd.fuqp.zygote.util.ZLUtils.args
 import com.iodvd.fuqp.zygote.util.ZLUtils.getArgument
 import com.iodvd.fuqp.zygote.util.ZLUtils.getStaticIntField
 import com.iodvd.fuqp.zygote.util.ZLUtils.setArgument
+import com.iodvd.fuqp.zygote.util.ZygoteConstants.PARAMETER_COUNT_UNKNOWN
 import com.iodvd.fuqp.zygote.util.ZygoteConstants.ACTIVITY_STACK_SUPERVISOR_CLASS
 import com.iodvd.fuqp.zygote.util.ZygoteConstants.ACTIVITY_STARTER_CLASS
 import com.iodvd.fuqp.zygote.util.ZygoteConstants.ACTIVITY_TASK_SUPERVISOR_CLASS
@@ -165,7 +165,8 @@ class ActivityHook : IFrameworkHook {
                         ACTIVITY_STARTER_CLASS,
                         "executeRequest",
                     ) { methodName, frame, returnValue ->
-                        guardRequest(methodName, frame.getArgument(1), fields, returnValue)
+                        val request = frame.getArgument(1) ?: return@hookBefore
+                        guardRequest(methodName, request, fields, returnValue)
                     }
                 } else {
                     val paramCount = findParamCount(ACTIVITY_STARTER_CLASS, "startActivity") {
@@ -178,7 +179,7 @@ class ActivityHook : IFrameworkHook {
                                 it[PRE_R_REAL_CALLING_UID - 1] == Int::class.javaPrimitiveType
                     }
 
-                    if (paramCount == BulkHooker.PARAMETER_COUNT_UNKNOWN) {
+                    if (paramCount == PARAMETER_COUNT_UNKNOWN) {
                         logW(TAG) { "No startActivity overload matches the expected layout" }
                     } else {
                         hookBefore(
