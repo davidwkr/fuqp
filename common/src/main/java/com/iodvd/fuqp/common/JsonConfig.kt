@@ -282,6 +282,17 @@ data class JsonConfig(
         var spoofAndroidId: Boolean = false,
 
         /**
+         * When THIS app (a querier/detector) does a UID→package reverse lookup
+         * (`getPackagesForUid`/`getNameForUid`) for a UID whose only owner is hidden from it,
+         * return a stable, plausible decoy package name instead of nothing. Closes the
+         * "live process UID with no visible package" mismatch that app-hiding otherwise leaks to
+         * a caller sweeping UIDs (e.g. via `getpriority`). See docs/UID_PROCESS_LEAK.md. Default
+         * off: it has a hard ceiling (it does not fake the on-disk package) and must be validated
+         * per-detector.
+         */
+        var decoyHiddenUidOwners: Boolean = false,
+
+        /**
          * A list of applied application templates, it has to contain items
          * from the global application template list
          */

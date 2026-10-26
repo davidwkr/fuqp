@@ -164,6 +164,7 @@ class AppSettingsV2Fragment : Fragment(R.layout.fragment_settings) {
                 "invertActivityLaunchProtection" -> pack.config.invertActivityLaunchProtection
                 "excludeVoldIsolation" -> pack.config.excludeVoldIsolation
                 "spoofAndroidId" -> pack.config.spoofAndroidId
+                "decoyHiddenUidOwners" -> pack.config.decoyHiddenUidOwners
                 else -> throw IllegalArgumentException("Invalid key: $key")
             }
         }
@@ -178,6 +179,7 @@ class AppSettingsV2Fragment : Fragment(R.layout.fragment_settings) {
                 "invertActivityLaunchProtection" -> pack.config.invertActivityLaunchProtection = value
                 "excludeVoldIsolation" -> pack.config.excludeVoldIsolation = value
                 "spoofAndroidId" -> pack.config.spoofAndroidId = value
+                "decoyHiddenUidOwners" -> pack.config.decoyHiddenUidOwners = value
                 else -> throw IllegalArgumentException("Invalid key: $key")
             }
         }

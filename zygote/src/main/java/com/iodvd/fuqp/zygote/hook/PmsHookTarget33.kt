@@ -123,6 +123,9 @@ open class PmsHookTarget33 : PmsHookTargetBase() {
             // hookAfter only reads the real return value back out of the frame on T+, and
             // ComputerEngine is a T-era class in any case - so this lives on the T+ target.
             hookIntentQuery()
+
+            // Reverse-lookup decoy (off unless a caller opts in). Same T+ class as above.
+            hookUidDecoy()
         }
     }
 }

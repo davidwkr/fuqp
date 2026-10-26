@@ -3,7 +3,9 @@ package com.iodvd.fuqp.zygote.hook
 import android.content.Intent
 import android.content.pm.IPackageManager
 import android.content.pm.ResolveInfo
+import android.os.Binder
 import com.iodvd.fuqp.common.Constants
+import com.iodvd.fuqp.common.Utils.binderLocalScope
 import com.iodvd.fuqp.common.Utils.getUserFromCallingUid
 import com.iodvd.fuqp.zygote.service.BulkHooker
 import com.iodvd.fuqp.zygote.service.ReturnValue
@@ -267,6 +269,68 @@ abstract class PmsHookTargetBase : IFrameworkHook {
                         " intent queries are NOT filtered"
             }
         }
+    }
+
+    /**
+     * Reverse-lookup decoy. App-hiding makes a hidden package invisible across every
+     * PackageManager surface, including `getPackagesForUid`/`getNameForUid`. A caller that
+     * enumerates process UIDs out of band (e.g. with `getpriority`) and then asks who owns each
+     * UID therefore sees "this UID has a live process but resolves to no package" — a mismatch
+     * that reveals hiding is active (see docs/UID_PROCESS_LEAK.md).
+     *
+     * For a caller that opts in (`decoyHiddenUidOwners`), a UID whose only owner is hidden *from
+     * that caller* resolves to a stable, plausible decoy package instead of nothing, so there is
+     * no mismatch. This does NOT fabricate the on-disk package, so it only satisfies detectors
+     * that stop at the reverse lookup; it is off by default and gated in O(1) by
+     * [FUQPService.anyDecoyCaller] so it costs nothing when unused.
+     */
+    protected fun BulkHooker.hookUidDecoy() {
+        val intType = Int::class.javaPrimitiveType!!
+
+        // getPackagesForUid(int) -> String[]
+        hookAfter(COMPUTER_ENGINE_CLASS, "getPackagesForUid", 1, listOf(intType)) { methodName, frame, returnValue ->
+            if (!service.anyDecoyCaller || returnValue.throwable != null) return@hookAfter
+            val existing = returnValue.result as? Array<*>
+            if (existing != null && existing.isNotEmpty()) return@hookAfter
+            val uid = frame.getArgument(1) as? Int ?: return@hookAfter
+            val decoy = resolveDecoyForQuery(uid) ?: return@hookAfter
+            returnValue.result = arrayOf(decoy)
+            logI(TAG) { "@$methodName decoy for uid $uid -> $decoy" }
+        }
+
+        // getNameForUid(int) -> String
+        hookAfter(COMPUTER_ENGINE_CLASS, "getNameForUid", 1, listOf(intType)) { methodName, frame, returnValue ->
+            if (!service.anyDecoyCaller || returnValue.throwable != null) return@hookAfter
+            val existing = returnValue.result as? String
+            if (!existing.isNullOrEmpty()) return@hookAfter
+            val uid = frame.getArgument(1) as? Int ?: return@hookAfter
+            val decoy = resolveDecoyForQuery(uid) ?: return@hookAfter
+            returnValue.result = decoy
+            logI(TAG) { "@$methodName decoy for uid $uid -> $decoy" }
+        }
+    }
+
+    /**
+     * The decoy name to hand this caller for [queriedUid], or null to leave the real (empty)
+     * result alone. Returns a decoy only when the caller opted in AND the UID genuinely hosts a
+     * package that is hidden from this caller — never for a UID that owns nothing (fabricating
+     * there would invent a package out of thin air).
+     */
+    private fun resolveDecoyForQuery(queriedUid: Int): String? {
+        val callingUid = Binder.getCallingUid()
+        if (callingUid == Constants.UID_SYSTEM) return null
+
+        val caller = getCallingApps(pms, callingUid).firstOrNull { service.isDecoyCaller(it) }
+            ?: return null
+
+        val realOwners = binderLocalScope { pms.getPackagesForUid(queriedUid) } ?: return null
+        if (realOwners.isEmpty()) return null
+
+        val callingUserId = getUserFromCallingUid(callingUid)
+        val hiddenFromCaller = realOwners.any { service.shouldHide(caller, it, callingUserId) }
+        if (!hiddenFromCaller) return null
+
+        return service.decoyPackageForUid(queriedUid)
     }
 
     /**

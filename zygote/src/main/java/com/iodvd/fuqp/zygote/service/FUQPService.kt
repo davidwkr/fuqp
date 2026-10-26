@@ -28,6 +28,7 @@ import com.iodvd.fuqp.common.Utils.encoder
 import com.iodvd.fuqp.common.Utils.generateRandomString
 import com.iodvd.fuqp.common.Utils.getInstalledApplicationsCompat
 import com.iodvd.fuqp.common.Utils.getPackageInfoCompat
+import com.iodvd.fuqp.common.Utils.getPackageUidCompat
 import com.iodvd.fuqp.common.AutoProtect
 import com.iodvd.fuqp.common.Utils.isSystemApp
 import com.iodvd.fuqp.common.settings_presets.ReplacementItem
@@ -423,6 +424,68 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         }
     }
 
+    /**
+     * True when at least one app has [JsonConfig.AppConfig.decoyHiddenUidOwners] enabled, so the
+     * reverse-lookup decoy hooks can bail in O(1) on every call when the feature is unused (the
+     * common case). Recomputed whenever the live config is published (see [refreshDerivedFlags]).
+     */
+    @Volatile
+    var anyDecoyCaller = false
+        private set
+
+    private fun refreshDerivedFlags() {
+        anyDecoyCaller = config.scope.values.any { it.decoyHiddenUidOwners }
+    }
+
+    /** Whether [caller] is configured to receive decoy names for UIDs it cannot otherwise see. */
+    fun isDecoyCaller(caller: String?) =
+        caller != null && config.scope[caller]?.decoyHiddenUidOwners == true
+
+    /**
+     * Plausible, Play-distributed packages used as decoys. Deliberately ordinary consumer apps:
+     * an unknown-package UID is itself a signal, whereas one of these is unremarkable. The real
+     * (installed) copy is skipped at selection time so a decoy never collides with a genuine
+     * package's UID.
+     */
+    private val decoyPackages = listOf(
+        "com.whatsapp", "com.spotify.music", "com.instagram.android", "com.facebook.katana",
+        "com.netflix.mediaclient", "org.telegram.messenger", "com.snapchat.android",
+        "com.ubercab", "com.pinterest", "com.duolingo", "com.shazam.android",
+        "com.dropbox.android", "com.adobe.reader", "com.microsoft.office.outlook",
+        "com.booking", "com.airbnb.android", "com.ebay.mobile",
+        "com.amazon.mShop.android.shopping", "com.linkedin.android", "com.skype.raider",
+        "com.viber.voip", "com.tripadvisor.tripadvisor", "deezer.android.app",
+        "com.soundcloud.android",
+    )
+
+    /**
+     * A stable decoy package name for [uid]: salted so it is neither guessable nor correlatable
+     * across devices, and the same every call so the value does not flicker. Any candidate that is
+     * actually installed (in user 0) is skipped to avoid one package resolving to two UIDs. Null if
+     * every candidate is installed.
+     */
+    fun decoyPackageForUid(uid: Int): String? {
+        if (decoyPackages.isEmpty()) return null
+        val digest = MessageDigest.getInstance("SHA-256").run {
+            update(androidIdSalt)
+            update(
+                byteArrayOf(
+                    uid.toByte(), (uid shr 8).toByte(), (uid shr 16).toByte(), (uid shr 24).toByte(),
+                )
+            )
+            digest()
+        }
+        val start = ((digest[0].toInt() and 0xff) shl 8) or (digest[1].toInt() and 0xff)
+        for (i in decoyPackages.indices) {
+            val candidate = decoyPackages[(start + i) % decoyPackages.size]
+            val installed = runCatching {
+                binderLocalScope { pms.getPackageUidCompat(candidate, 0L, 0) }
+            }.getOrDefault(-1)
+            if (installed < 0) return candidate
+        }
+        return null
+    }
+
     fun getEnabledSettingsTemplates(caller: String?) =
         config.scope[caller]?.applySettingTemplates ?: setOf()
 
@@ -552,6 +615,7 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
                     return
                 }
                 config = newConfig
+                refreshDerivedFlags()
                 ensureFileIsRW(configFile, true)
                 configFile.writeText(json)
                 dataHolder.clearUidCache()
@@ -892,6 +956,7 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
             loading.cleanRemnantsFromConfig()
             config = loading
         }
+        refreshDerivedFlags()
 
         logI(TAG) { "Config loaded" }
     }

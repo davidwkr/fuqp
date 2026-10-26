@@ -28,5 +28,11 @@
             android:summary="@string/app_spoof_android_id_desc"
             app:singleLineTitle="false"
             android:title="@string/app_spoof_android_id" />
+        <SwitchPreferenceCompat
+            android:icon="@drawable/outline_shop_24"
+            android:key="decoyHiddenUidOwners"
+            android:summary="@string/app_decoy_hidden_uids_desc"
+            app:singleLineTitle="false"
+            android:title="@string/app_decoy_hidden_uids" />
     </PreferenceCategory>
 </PreferenceScreen>
