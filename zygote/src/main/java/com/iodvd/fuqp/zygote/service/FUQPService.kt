@@ -113,6 +113,23 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
     var config = JsonConfig().apply { detailLog = true }
         private set
 
+    /**
+     * uid -> decoy, so the value is stable per boot and never shared across two UIDs. Declared
+     * ahead of the init block: reloadConfigFromFile() runs during init and clears this, so its
+     * backing field must already exist.
+     */
+    private val decoyAssignments = java.util.concurrent.ConcurrentHashMap<Int, String>()
+
+    /**
+     * True when at least one app has [JsonConfig.AppConfig.decoyHiddenUidOwners] enabled, so the
+     * reverse-lookup decoy hooks bail in O(1) when the feature is unused (the common case).
+     * Recomputed by [refreshDerivedFlags] whenever the live config is published — declared ahead of
+     * the init block so its `= false` initializer cannot overwrite the value that init computes.
+     */
+    @Volatile
+    var anyDecoyCaller = false
+        private set
+
     init {
         managerWorkMode = if (pms.isConflictingModuleInstalled()) {
             logE(TAG) { "Conflicting module detected, skipping hook" }
@@ -424,15 +441,6 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         }
     }
 
-    /**
-     * True when at least one app has [JsonConfig.AppConfig.decoyHiddenUidOwners] enabled, so the
-     * reverse-lookup decoy hooks can bail in O(1) on every call when the feature is unused (the
-     * common case). Recomputed whenever the live config is published (see [refreshDerivedFlags]).
-     */
-    @Volatile
-    var anyDecoyCaller = false
-        private set
-
     private fun refreshDerivedFlags() {
         anyDecoyCaller = config.scope.values.any { it.decoyHiddenUidOwners }
         decoyAssignments.clear()
@@ -458,9 +466,6 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         "com.viber.voip", "com.tripadvisor.tripadvisor", "deezer.android.app",
         "com.soundcloud.android",
     )
-
-    /** uid -> decoy, so the value is stable per boot and never shared across two UIDs. */
-    private val decoyAssignments = java.util.concurrent.ConcurrentHashMap<Int, String>()
 
     /**
      * A stable decoy package name for [uid]: salted so it is neither guessable nor correlatable
