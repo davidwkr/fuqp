@@ -128,6 +128,45 @@
             android:title="@string/settings_max_log_size" />
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="@string/title_auto_protect">
+        <SwitchPreferenceCompat
+            android:icon="@drawable/outline_shield_24"
+            android:key="autoProtectEnabled"
+            app:singleLineTitle="false"
+            android:title="@string/autoprotect_settings_apply_on_install"
+            android:summary="@string/autoprotect_settings_apply_on_install_summary" />
+        <SwitchPreferenceCompat
+            android:icon="@drawable/outline_shield_24"
+            android:key="autoProtectNotify"
+            app:singleLineTitle="false"
+            android:title="@string/autoprotect_settings_notify"
+            android:summary="@string/autoprotect_settings_notify_summary" />
+        <Preference
+            android:icon="@drawable/outline_edit_24"
+            android:key="autoProtectSensitivePackages"
+            app:singleLineTitle="false"
+            android:title="@string/autoprotect_settings_sensitive_apps"
+            android:summary="@string/autoprotect_settings_sensitive_apps_summary" />
+        <Preference
+            android:icon="@drawable/outline_edit_24"
+            android:key="autoProtectSensitiveKeywords"
+            app:singleLineTitle="false"
+            android:title="@string/autoprotect_settings_sensitive_keywords"
+            android:summary="@string/autoprotect_settings_sensitive_keywords_summary" />
+        <Preference
+            android:icon="@drawable/outline_edit_24"
+            android:key="autoProtectProxyPackages"
+            app:singleLineTitle="false"
+            android:title="@string/autoprotect_settings_proxy_apps"
+            android:summary="@string/autoprotect_settings_proxy_apps_summary" />
+        <Preference
+            android:icon="@drawable/outline_shield_24"
+            android:key="autoProtectReapply"
+            app:singleLineTitle="false"
+            android:title="@string/autoprotect_settings_reapply"
+            android:summary="@string/autoprotect_settings_reapply_summary" />
+    </PreferenceCategory>
+
     <PreferenceCategory android:title="@string/settings_service">
         <Preference
             android:icon="@drawable/outline_delete_24"

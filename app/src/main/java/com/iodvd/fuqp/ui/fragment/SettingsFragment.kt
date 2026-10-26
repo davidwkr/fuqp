@@ -17,6 +17,16 @@ import androidx.preference.PreferenceDataStore
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SeekBarPreference
 import androidx.preference.SwitchPreferenceCompat
+import android.widget.EditText
+import android.widget.FrameLayout
+import android.text.InputType
+import com.iodvd.fuqp.util.PackageHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import com.google.android.material.color.DynamicColors
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dev.androidbroadcast.vbpd.viewBinding
@@ -112,6 +122,8 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
                 "enableInternet" -> PrefManager.enableInternet == Constants.ENABLE_INTERNET_ON
                 "disableUpdate" -> PrefManager.disableUpdate
                 "webViewProtection" -> ConfigManager.webViewProtection
+                "autoProtectEnabled" -> ConfigManager.autoProtect.enabled
+                "autoProtectNotify" -> ConfigManager.autoProtect.notify
                 else -> throw IllegalArgumentException("Invalid key: $key")
             }
         }
@@ -157,6 +169,8 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
                 "voldAppDataIsolation" -> ConfigManager.altVoldAppDataIsolation = value
                 "skipSystemAppDataIsolation" -> ConfigManager.skipSystemAppDataIsolation = value
                 "webViewProtection" -> ConfigManager.webViewProtection = value
+                "autoProtectEnabled" -> ConfigManager.autoProtect = ConfigManager.autoProtect.also { it.enabled = value }
+                "autoProtectNotify" -> ConfigManager.autoProtect = ConfigManager.autoProtect.also { it.notify = value }
                 else -> throw IllegalArgumentException("Invalid key: $key")
             }
         }
@@ -278,6 +292,102 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
                         .commit()
 
                     true
+                }
+            }
+        }
+
+        private var autoProtectRunning = false
+
+        private fun configureAutoProtectList(
+            key: String,
+            titleRes: Int,
+            lowercase: Boolean,
+            selector: (JsonConfig.AutoProtectConfig) -> MutableSet<String>,
+        ) {
+            findPreference<Preference>(key)?.setOnPreferenceClickListener {
+                // Read fresh so the dialog reflects the current config.
+                val current = selector(ConfigManager.autoProtect).sorted().joinToString("\n")
+                val context = requireContext()
+                val editText = EditText(context).apply {
+                    inputType = InputType.TYPE_CLASS_TEXT or
+                            InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                            InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+                    setHint(R.string.autoprotect_settings_list_hint)
+                    minLines = 5
+                    gravity = android.view.Gravity.TOP or android.view.Gravity.START
+                    setText(current)
+                }
+                val padding = (24 * resources.displayMetrics.density).toInt()
+                val container = FrameLayout(context).apply {
+                    setPadding(padding, padding / 2, padding, 0)
+                    addView(editText)
+                }
+
+                MaterialAlertDialogBuilder(context)
+                    .setTitle(titleRes)
+                    .setView(container)
+                    .setPositiveButton(android.R.string.ok) { _, _ ->
+                        val lines = editText.text.toString()
+                            .lineSequence()
+                            .map { line -> line.trim() }
+                            .filter { line -> line.isNotEmpty() }
+                            .map { line -> if (lowercase) line.lowercase() else line }
+                            .toSet()
+                        val cfg = ConfigManager.autoProtect
+                        val target = selector(cfg)
+                        target.clear()
+                        target.addAll(lines)
+                        // Reassign so the setter persists the change.
+                        ConfigManager.autoProtect = cfg
+                    }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+
+                true
+            }
+        }
+
+        private fun reapplyAutoProtect() {
+            // Ignore re-taps while a run is in flight.
+            if (autoProtectRunning) return
+            autoProtectRunning = true
+            showToast(R.string.auto_protect_running)
+            lifecycleScope.launch {
+                try {
+                    val packages = withTimeoutOrNull(PACKAGE_FETCH_TIMEOUT_MS) {
+                        suspendCancellableCoroutine { cont ->
+                            PackageHelper.invalidateCache {
+                                if (cont.isActive) {
+                                    cont.resumeWith(
+                                        Result.success(
+                                            PackageHelper.appList.replayCache.firstOrNull() ?: emptyList(),
+                                        ),
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (packages.isNullOrEmpty()) {
+                        showToast(R.string.auto_protect_failed)
+                        return@launch
+                    }
+
+                    val result = withContext(Dispatchers.IO + NonCancellable) {
+                        ConfigManager.applyAutoProtect(packages) { PackageHelper.isSystem(it) }
+                    }
+
+                    if (result == null) {
+                        showToast(R.string.auto_protect_failed)
+                    } else {
+                        showToast(getString(R.string.auto_protect_result, result.sensitive, result.proxy))
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (_: Throwable) {
+                    showToast(R.string.auto_protect_failed)
+                } finally {
+                    autoProtectRunning = false
                 }
             }
         }
@@ -473,6 +583,27 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
                 }
             }
 
+            configureAutoProtectList(
+                "autoProtectSensitivePackages",
+                R.string.autoprotect_settings_sensitive_apps,
+                lowercase = false,
+            ) { it.sensitivePackages }
+            configureAutoProtectList(
+                "autoProtectSensitiveKeywords",
+                R.string.autoprotect_settings_sensitive_keywords,
+                lowercase = true,
+            ) { it.sensitiveKeywords }
+            configureAutoProtectList(
+                "autoProtectProxyPackages",
+                R.string.autoprotect_settings_proxy_apps,
+                lowercase = false,
+            ) { it.proxyPackages }
+
+            findPreference<Preference>("autoProtectReapply")?.setOnPreferenceClickListener {
+                reapplyAutoProtect()
+                true
+            }
+
             findPreference<Preference>("resetDefault")?.setOnPreferenceClickListener {
                 if (ServiceClient.serviceVersion != 0) {
                     MaterialAlertDialogBuilder(requireContext())
@@ -506,6 +637,10 @@ class SettingsFragment : Fragment(R.layout.fragment_settings), PreferenceFragmen
         override fun onResume() {
             super.onResume()
             configureDataIsolation()
+        }
+
+        private companion object {
+            const val PACKAGE_FETCH_TIMEOUT_MS = 20_000L
         }
     }
 }
