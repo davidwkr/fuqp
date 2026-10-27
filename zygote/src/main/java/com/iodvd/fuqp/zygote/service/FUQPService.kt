@@ -477,8 +477,15 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
     @Volatile
     private var decoyAvailableGen = 0L
 
-    @Synchronized
-    private fun refreshDerivedFlags() {
+    /**
+     * Dedicated monitor for [refreshDerivedFlags]. We deliberately do NOT use `this` (round-4
+     * Verify #3): refreshDerivedFlags does PM IPC through [binderLocalScope], and holding the
+     * service instance's monitor while an IPC is in flight invites a lock-order inversion if any
+     * other code anywhere ever synchronises on the FUQPService instance externally.
+     */
+    private val refreshLock = Any()
+
+    private fun refreshDerivedFlags() = synchronized(refreshLock) {
         // Build locally and publish from the local — refreshDerivedFlags now runs from both the
         // config publish path and the package-event path (H-B), so building directly into
         // decoyCallerAppIds would race (review round-3 L2).
@@ -564,25 +571,35 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         }
     }
 
+    /** [computeDecoyAvailable] result: the generation it ran under, the available-candidates set,
+     *  and whether any IPC failed during the compute. Callers use `failed` to distinguish a real
+     *  pool exhaustion from an availability snapshot shrunk by transient failures. */
+    private data class DecoySnapshot(val gen: Long, val available: Set<String>, val failed: Boolean)
+
     /**
      * Compute (or recompute) the set of decoy candidates not currently installed. Does its IPC
      * OUTSIDE the assignment lock — never issue a PM binder call while holding our monitor
-     * (review C1). A candidate counts as installed if it exists in ANY user (review round-3 M2:
-     * decoys are per-user via H-B, and a work-profile install would otherwise be missed and
-     * cause a two-uids-to-one-package contradiction).
+     * (review C1). A candidate counts as installed if it exists in ANY user (round-3 M2: decoys
+     * are per-user via H-B, and a work-profile install would otherwise be missed and cause a
+     * two-uids-to-one-package contradiction).
      *
      * The published cache is stamped with the generation it was computed under so a cache that
-     * raced an invalidation is detected and discarded (round-3 M1). On any IPC failure for any
-     * candidate the cache is NOT published and that candidate is excluded from the result
-     * (fail-closed per M-C; round-3 L1 against caching failure).
+     * raced an invalidation is detected and discarded (round-3 M1). On any IPC failure the cache
+     * is NOT published and the failed candidate is excluded from the result (fail-closed per M-C
+     * and round-3 L1). Users enumeration failing is itself a fail-closed outcome — return the
+     * empty set with `failed=true` rather than falling back to user 0 only (round-4 M-1).
      */
-    private fun computeDecoyAvailable(): Pair<Long, Set<String>> {
+    private fun computeDecoyAvailable(): DecoySnapshot {
         val gen = decoyAvailableGen
-        decoyAvailable?.takeIf { it.first == gen }?.let { return it }
+        decoyAvailable?.takeIf { it.first == gen }?.let {
+            return DecoySnapshot(gen, it.second, failed = false)
+        }
 
+        // Round-4 M-1: if we can't enumerate users, fall closed. Checking only user 0 would miss
+        // a work-profile install of a candidate and let it collide with a real uid there.
         val users = runCatching {
             binderLocalScope { UserManagerUtils.userIds }
-        }.getOrNull() ?: intArrayOf(0)
+        }.getOrNull() ?: return DecoySnapshot(gen, emptySet(), failed = true)
 
         val notInstalled = HashSet<String>(decoyPackages.size)
         var sawFailure = false
@@ -618,7 +635,7 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
                 if (decoyAvailableGen == gen) decoyAvailable = snap
             }
         }
-        return snap
+        return DecoySnapshot(gen, notInstalled, failed = sawFailure)
     }
 
     /**
@@ -634,11 +651,15 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
 
         // computeDecoyAvailable returns the gen it was computed under — we use that same gen for
         // the TOCTOU check inside the lock. Snapshotting a separate `decoyAvailableGen` after the
-        // compute would race (the invalidation could run DURING the compute and bump gen before
+        // compute would race (an invalidation could run DURING the compute and bump gen before
         // we read it, defeating the check — round-3 M1).
-        val (genBefore, available) = computeDecoyAvailable()
+        val snapshot = computeDecoyAvailable()
+        val available = snapshot.available
+        val genBefore = snapshot.gen
         if (available.isEmpty()) {
-            logDecoyExhaustion()
+            // Round-4 L-1: don't consume the one-shot exhaustion log when emptiness came from a
+            // transient failure — a real exhaustion later would then go unlogged.
+            if (!snapshot.failed) logDecoyExhaustion()
             return null
         }
 
