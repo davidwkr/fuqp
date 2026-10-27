@@ -595,11 +595,14 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
             return DecoySnapshot(gen, it.second, failed = false)
         }
 
-        // Round-4 M-1: if we can't enumerate users, fall closed. Checking only user 0 would miss
-        // a work-profile install of a candidate and let it collide with a real uid there.
+        // Round-4 M-1 (and round-5 nit #1): if we can't enumerate users — or the array comes back
+        // empty — fail closed. Checking only user 0 would miss a work-profile install of a
+        // candidate and let it collide with a real uid there; an empty array would silently mark
+        // every candidate "not installed" and cache it.
         val users = runCatching {
             binderLocalScope { UserManagerUtils.userIds }
-        }.getOrNull() ?: return DecoySnapshot(gen, emptySet(), failed = true)
+        }.getOrNull()?.takeIf { it.isNotEmpty() }
+            ?: return DecoySnapshot(gen, emptySet(), failed = true)
 
         val notInstalled = HashSet<String>(decoyPackages.size)
         var sawFailure = false
