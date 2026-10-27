@@ -81,6 +81,9 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
 
         /** Settings.Secure key for the per-app SSAID we optionally spoof. */
         private const val ANDROID_ID_SETTING = "android_id"
+
+        /** Domain-separation prefix mixed into the decoy UID hash (review M3). */
+        private val DECOY_SALT_PREFIX = "fuqp:decoy:v1".toByteArray()
     }
 
     @Volatile
@@ -441,14 +444,67 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         }
     }
 
+    /**
+     * App-ids (uid % 100000) of apps opted in to the reverse-lookup decoy. Lets the hook bail in
+     * O(1) on the caller side without resolving packages, even when some *other* app has the
+     * feature on. Recomputed from the live config in [refreshDerivedFlags].
+     */
+    @Volatile
+    private var decoyCallerAppIds: Set<Int> = emptySet()
+
+    /** Decoy name -> hidden uid, so forward lookups can mirror the reverse lookup consistently. */
+    private val decoyToUid = java.util.concurrent.ConcurrentHashMap<String, Int>()
+
+    /**
+     * Decoy candidates known not to be installed, cached outside the assignment lock to keep IPC
+     * out of the critical section (see review C1). Null = not yet computed; recomputed on first
+     * use after a reset. Rebuilt when a decoy package is installed/removed (see H5).
+     */
+    @Volatile
+    private var decoyAvailable: Set<String>? = null
+
+    /** One MessageDigest per thread, reused across calls — avoids per-call allocation (M2). */
+    private val digestLocal = ThreadLocal.withInitial { MessageDigest.getInstance("SHA-256") }
+
+    /** Logged once per boot when every candidate is in use (L2). */
+    @Volatile
+    private var decoyExhaustionLogged = false
+
     private fun refreshDerivedFlags() {
-        anyDecoyCaller = config.scope.values.any { it.decoyHiddenUidOwners }
-        decoyAssignments.clear()
+        val newAppIds = buildSet {
+            for ((name, cfg) in config.scope) {
+                if (!cfg.decoyHiddenUidOwners) continue
+                val uid = runCatching {
+                    binderLocalScope { pms.getPackageUidCompat(name, 0L, 0) }
+                }.getOrDefault(-1)
+                if (uid >= 0) add(uid % 100000)
+            }
+        }
+        val callerSetChanged = newAppIds != decoyCallerAppIds
+        decoyCallerAppIds = newAppIds
+        anyDecoyCaller = newAppIds.isNotEmpty()
+
+        // Don't clear on every config publish (H4) — a UID's decoy flipping without a package
+        // event is itself an "impossibility" signal. Only reset when the opt-in set changes.
+        if (callerSetChanged) {
+            synchronized(decoyAssignments) {
+                decoyAssignments.clear()
+                decoyToUid.clear()
+                decoyAvailable = null
+                decoyExhaustionLogged = false
+            }
+        }
     }
 
     /** Whether [caller] is configured to receive decoy names for UIDs it cannot otherwise see. */
     fun isDecoyCaller(caller: String?) =
         caller != null && config.scope[caller]?.decoyHiddenUidOwners == true
+
+    /** Opt-in check by app-id — used by the hooks to bail without any IPC. */
+    fun isDecoyCallerAppId(appId: Int) = appId in decoyCallerAppIds
+
+    /** Forward-lookup inverse: given a decoy name, the hidden uid it stands for (null if none). */
+    fun hiddenUidForDecoy(decoy: String?): Int? = decoy?.let { decoyToUid[it] }
 
     /**
      * Plausible, Play-distributed packages used as decoys. Deliberately ordinary consumer apps:
@@ -467,17 +523,63 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         "com.soundcloud.android",
     )
 
+    /** True if [name] is a decoy candidate — fast membership test used by the invalidation hook. */
+    fun isDecoyCandidate(name: String?) = name != null && name in decoyPackages
+
+    /** Invalidate a decoy that just became installed (H5): remove any uid mapped to it. */
+    fun invalidateDecoyAssignment(packageName: String) {
+        if (packageName !in decoyPackages) return
+        synchronized(decoyAssignments) {
+            decoyToUid.remove(packageName)
+            val uidsToDrop = decoyAssignments.entries
+                .filter { it.value == packageName }
+                .map { it.key }
+            for (u in uidsToDrop) decoyAssignments.remove(u)
+            decoyAvailable = null
+        }
+    }
+
+    /**
+     * Compute (or recompute) the set of decoy candidates not currently installed. Does its IPC
+     * OUTSIDE the assignment lock — never issue a PM binder call while holding our monitor
+     * (review C1). Called lazily and whenever a decoy package event invalidates the cache.
+     */
+    private fun computeDecoyAvailable(): Set<String> {
+        decoyAvailable?.let { return it }
+        val notInstalled = decoyPackages.filterTo(HashSet()) { candidate ->
+            val uid = runCatching {
+                binderLocalScope { pms.getPackageUidCompat(candidate, 0L, 0) }
+            }.getOrDefault(-1)
+            uid < 0
+        }
+        decoyAvailable = notInstalled
+        return notInstalled
+    }
+
     /**
      * A stable decoy package name for [uid]: salted so it is neither guessable nor correlatable
      * across devices, and the same every call so the value does not flicker. Candidates that are
-     * actually installed, or already handed to another UID, are skipped — a package resolving to two
-     * UIDs is itself a contradiction a detector could catch. Null if no free candidate remains.
+     * installed or already handed to another uid are skipped — a package resolving to two uids is
+     * itself a contradiction a detector could catch. Null if no free candidate remains.
      */
     fun decoyPackageForUid(uid: Int): String? {
         decoyAssignments[uid]?.let { return it }
         if (decoyPackages.isEmpty()) return null
 
-        val digest = MessageDigest.getInstance("SHA-256").run {
+        // Precompute the installed set outside the lock (C1, M5).
+        val available = computeDecoyAvailable()
+        if (available.isEmpty()) {
+            if (!decoyExhaustionLogged) {
+                decoyExhaustionLogged = true
+                logW(TAG) { "decoy pool exhausted; UID $uid will leak as 'live, no package'" }
+            }
+            return null
+        }
+
+        // Digest is cheap but allocates; use thread-local and compute AFTER fast-path (M2).
+        val digest = digestLocal.get()!!.run {
+            reset()
+            update(DECOY_SALT_PREFIX)   // domain-separate from spoofedAndroidId salt use (M3)
             update(androidIdSalt)
             update(
                 byteArrayOf(
@@ -493,14 +595,15 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
             val taken = decoyAssignments.values.toHashSet()
             for (i in decoyPackages.indices) {
                 val candidate = decoyPackages[(start + i) % decoyPackages.size]
+                if (candidate !in available) continue
                 if (candidate in taken) continue
-                val installed = runCatching {
-                    binderLocalScope { pms.getPackageUidCompat(candidate, 0L, 0) }
-                }.getOrDefault(-1)
-                if (installed < 0) {
-                    decoyAssignments[uid] = candidate
-                    return candidate
-                }
+                decoyAssignments[uid] = candidate
+                decoyToUid[candidate] = uid
+                return candidate
+            }
+            if (!decoyExhaustionLogged) {
+                decoyExhaustionLogged = true
+                logW(TAG) { "decoy pool exhausted; UID $uid will leak as 'live, no package'" }
             }
             return null
         }
@@ -696,6 +799,11 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
                         appUid = findAndVerifyAppSignature(pms)
                     }
 
+                    // Decoy collision check (H5): if a decoy candidate just got installed, drop any
+                    // uids mapped to it (they would otherwise resolve to a package that now has its
+                    // own real uid — one package under two uids). Also recompute decoyAvailable.
+                    if (isDecoyCandidate(packageName)) invalidateDecoyAssignment(packageName)
+
                     /**
                      * - Ignore when the default config was not available
                      * - Ignore for the manager app
@@ -750,6 +858,9 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
                     if (extras?.getBoolean(Intent.EXTRA_REPLACING) == true) {
                         return
                     }
+
+                    // Decoy pool bookkeeping: a removed decoy candidate becomes available again.
+                    if (isDecoyCandidate(packageName)) decoyAvailable = null
 
                     if (packageName == BuildConfig.APP_PACKAGE_NAME && appUid >= 0) {
                         logI(TAG) { "The manager app is uninstalled, looking for alternatives" }

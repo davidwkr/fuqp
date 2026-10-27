@@ -4,6 +4,7 @@ import android.content.Intent
 import android.content.pm.IPackageManager
 import android.content.pm.ResolveInfo
 import android.os.Binder
+import android.os.Process
 import com.iodvd.fuqp.common.Constants
 import com.iodvd.fuqp.common.Utils.binderLocalScope
 import com.iodvd.fuqp.common.Utils.getUserFromCallingUid
@@ -280,54 +281,146 @@ abstract class PmsHookTargetBase : IFrameworkHook {
      *
      * For a caller that opts in (`decoyHiddenUidOwners`), a UID whose only owner is hidden *from
      * that caller* resolves to a stable, plausible decoy package instead of nothing, so there is
-     * no mismatch. This does NOT fabricate the on-disk package, so it only satisfies detectors
-     * that stop at the reverse lookup; it is off by default and gated in O(1) by
-     * [FUQPService.anyDecoyCaller] so it costs nothing when unused.
+     * no mismatch. Reverse and forward lookups (uid→name, name→uid, getPackageUid) are kept
+     * consistent for the same caller so a one-round-trip cross-check does not catch the decoy;
+     * the on-disk APK/datadir is still real, so a detector that opens them can still tell.
+     *
+     * Off by default; gated per-caller O(1) by [FUQPService.isDecoyCallerAppId] so it costs
+     * nothing for callers that have not opted in, even when some other app has.
      */
     protected fun BulkHooker.hookUidDecoy() {
         val intType = Int::class.javaPrimitiveType!!
+        val intArrayType = IntArray::class.java
+        val stringType = String::class.java
+        val longType = Long::class.javaPrimitiveType!!
 
         // getPackagesForUid(int) -> String[]
         hookAfter(COMPUTER_ENGINE_CLASS, "getPackagesForUid", 1, listOf(intType)) { methodName, frame, returnValue ->
-            if (!service.anyDecoyCaller || returnValue.throwable != null) return@hookAfter
+            if (returnValue.throwable != null) return@hookAfter
             val existing = returnValue.result as? Array<*>
             if (existing != null && existing.isNotEmpty()) return@hookAfter
             val uid = frame.getArgument(1) as? Int ?: return@hookAfter
-            val decoy = resolveDecoyForQuery(uid) ?: return@hookAfter
-            returnValue.result = arrayOf(decoy)
-            logI(TAG) { "@$methodName decoy for uid $uid -> $decoy" }
+            withDecoyGuard {
+                val decoy = resolveDecoyForQuery(uid) ?: return@withDecoyGuard
+                returnValue.result = arrayOf(decoy)
+                logD(TAG) { "@$methodName decoy for uid $uid -> $decoy" }
+            }
         }
 
         // getNameForUid(int) -> String
         hookAfter(COMPUTER_ENGINE_CLASS, "getNameForUid", 1, listOf(intType)) { methodName, frame, returnValue ->
-            if (!service.anyDecoyCaller || returnValue.throwable != null) return@hookAfter
+            if (returnValue.throwable != null) return@hookAfter
             val existing = returnValue.result as? String
             if (!existing.isNullOrEmpty()) return@hookAfter
             val uid = frame.getArgument(1) as? Int ?: return@hookAfter
-            val decoy = resolveDecoyForQuery(uid) ?: return@hookAfter
-            returnValue.result = decoy
-            logI(TAG) { "@$methodName decoy for uid $uid -> $decoy" }
+            withDecoyGuard {
+                val decoy = resolveDecoyForQuery(uid) ?: return@withDecoyGuard
+                returnValue.result = decoy
+                logD(TAG) { "@$methodName decoy for uid $uid -> $decoy" }
+            }
+        }
+
+        // getNamesForUids(int[]) -> String[]: array of nullable names, one per queried uid.
+        // Fill in decoy slots that would otherwise be null.
+        hookAfter(COMPUTER_ENGINE_CLASS, "getNamesForUids", 1, listOf(intArrayType)) { methodName, frame, returnValue ->
+            if (returnValue.throwable != null) return@hookAfter
+            val uids = frame.getArgument(1) as? IntArray ?: return@hookAfter
+            @Suppress("UNCHECKED_CAST")
+            val names = (returnValue.result as? Array<String?>)?.copyOf() ?: return@hookAfter
+            if (names.size != uids.size) return@hookAfter
+            withDecoyGuard {
+                var changed = false
+                for (i in uids.indices) {
+                    if (!names[i].isNullOrEmpty()) continue
+                    val decoy = resolveDecoyForQuery(uids[i]) ?: continue
+                    names[i] = decoy
+                    changed = true
+                }
+                if (changed) {
+                    returnValue.result = names
+                    logD(TAG) { "@$methodName decoyed ${uids.size} uid(s)" }
+                }
+            }
+        }
+
+        // getPackageUid(String, long, int) -> int: forward direction. If the queried name is a
+        // decoy this caller has already received, return the hidden app's uid so the caller sees
+        // name <-> uid consistency. Without this, the detector's "I saw uid X -> name N, now
+        // give me the uid of N" cross-check fails with NameNotFound and is a stronger signal.
+        hookAfter(
+            COMPUTER_ENGINE_CLASS, "getPackageUid", 3,
+            listOf(stringType, longType, intType),
+        ) { methodName, frame, returnValue ->
+            if (returnValue.throwable != null) return@hookAfter
+            val existing = returnValue.result as? Int ?: return@hookAfter
+            if (existing >= 0) return@hookAfter   // the name resolved for real; don't touch
+            val name = frame.getArgument(1) as? String ?: return@hookAfter
+            withDecoyGuard {
+                val callingUid = Binder.getCallingUid()
+                if (callingUid == Constants.UID_SYSTEM) return@withDecoyGuard
+                if (!service.isDecoyCallerAppId((callingUid % 100000))) return@withDecoyGuard
+                val hiddenUid = service.hiddenUidForDecoy(name) ?: return@withDecoyGuard
+                returnValue.result = hiddenUid
+                logD(TAG) { "@$methodName decoy forward $name -> $hiddenUid" }
+            }
+        }
+    }
+
+    /**
+     * Per-thread reentrancy guard. The decoy helpers call back into PMS via `binderLocalScope`,
+     * which routes through the very hooks they live in. The UID-is-SYSTEM check short-circuits
+     * the nested call under normal conditions, but relying on that alone is fragile (review C2):
+     * if someone reorders the guards, or `binderLocalScope` ever changes the identity semantics,
+     * the result is unbounded recursion on a binder thread. This makes the guarantee explicit.
+     */
+    private val decoyReentry = ThreadLocal.withInitial { false }
+
+    private inline fun withDecoyGuard(block: () -> Unit) {
+        if (decoyReentry.get() == true) return
+        decoyReentry.set(true)
+        try {
+            runCatching { block() }.onFailure {
+                logW(TAG) { "decoy hook threw, suppressing: ${it.message}" }
+            }
+        } finally {
+            decoyReentry.set(false)
         }
     }
 
     /**
      * The decoy name to hand this caller for [queriedUid], or null to leave the real (empty)
-     * result alone. Returns a decoy only when the caller opted in AND the UID genuinely hosts a
-     * package that is hidden from this caller — never for a UID that owns nothing (fabricating
-     * there would invent a package out of thin air).
+     * result alone. Returns a decoy only when:
+     *  - the caller opted in (fast O(1) check by caller app-id, no PM IPC on the miss path),
+     *  - [queriedUid] is a plain application uid (not isolated / sandbox / shared-GID / system),
+     *  - the uid is a single-package uid (shared-user uids use a different name format, so
+     *    returning a bare package name would itself be a signal — H2),
+     *  - the one owner is actually hidden *from this caller*, evaluated in the uid's user.
      */
     private fun resolveDecoyForQuery(queriedUid: Int): String? {
         val callingUid = Binder.getCallingUid()
         if (callingUid == Constants.UID_SYSTEM) return null
+
+        // Fast opt-in check: no PM IPC unless the caller actually has decoy on (review M1).
+        if (!service.isDecoyCallerAppId((callingUid % 100000))) return null
+
+        // Only ordinary application uids (review H3). Isolated/sandbox/shared-GID uids never
+        // belong to a top-level consumer app so decoying them is itself a tell.
+        val appId = queriedUid % 100000
+        if (appId !in Process.FIRST_APPLICATION_UID..Process.LAST_APPLICATION_UID) return null
 
         val caller = getCallingApps(pms, callingUid).firstOrNull { service.isDecoyCaller(it) }
             ?: return null
 
         val realOwners = binderLocalScope { pms.getPackagesForUid(queriedUid) } ?: return null
         if (realOwners.isEmpty()) return null
+        // Shared-user uids: more than one owner, and the real name format for them is
+        // "sharedName:uid", not a bare package. Skip rather than invent an incompatible shape (H2).
+        if (realOwners.size > 1) return null
 
-        val callingUserId = getUserFromCallingUid(callingUid)
-        val hiddenFromCaller = realOwners.any { service.shouldHide(caller, it, callingUserId) }
+        // Evaluate hiding in the uid's user, not the caller's (H3): a caller sweeping cross-user
+        // uids would otherwise get a decision based on the wrong user's state.
+        val queriedUserId = getUserFromCallingUid(queriedUid)
+        val hiddenFromCaller = realOwners.any { service.shouldHide(caller, it, queriedUserId) }
         if (!hiddenFromCaller) return null
 
         return service.decoyPackageForUid(queriedUid)

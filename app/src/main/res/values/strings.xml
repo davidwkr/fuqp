@@ -159,7 +159,7 @@
     <string name="app_spoof_android_id">Spoof Android ID</string>
     <string name="app_spoof_android_id_desc">Return a fake, stable Android ID (SSAID) to this app instead of the real device value, defeating reinstall tracking</string>
     <string name="app_decoy_hidden_uids">Decoy hidden-app UIDs</string>
-    <string name="app_decoy_hidden_uids_desc">When this app looks up who owns a process UID it can\'t see, return a plausible decoy package instead of nothing. Hides the \"running process with no app\" clue a UID scan leaks. Does not fake the app on disk — enable only for detectors that check UIDs</string>
+    <string name="app_decoy_hidden_uids_desc">When this app looks up who owns a process UID it can\'t see, return a plausible decoy package instead of nothing. Hides the \"running process with no app\" clue a UID scan leaks. The decoy is not installed on disk, so a detector that opens the APK or checks the data directory can still catch it — enable per-detector and verify by re-scan</string>
     <string name="app_force_stop_warning">Don\'t forget to force stop the target app after saving the configuration</string>
     <string name="app_invert_activity_launch_protection">Invert Activity launch protection</string>
     <string name="app_invert_activity_launch_protection_desc">This option will invert \"Disable Activity launch protection\" selection in Settings.</string>
