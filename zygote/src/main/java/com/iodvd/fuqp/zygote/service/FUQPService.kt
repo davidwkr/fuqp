@@ -454,11 +454,12 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
 
     /**
      * Decoy candidates known not to be installed, cached outside the assignment lock to keep IPC
-     * out of the critical section (see review C1). Null = not yet computed; recomputed on first
-     * use after a reset. Rebuilt when a decoy package is installed/removed (see H5).
+     * out of the critical section (review C1). Stamped with the generation it was computed under
+     * so a cache published across an invalidation can be detected and discarded (review round-3
+     * M1). Null = not yet computed.
      */
     @Volatile
-    private var decoyAvailable: Set<String>? = null
+    private var decoyAvailable: Pair<Long, Set<String>>? = null
 
     /** One MessageDigest per thread, reused across calls — avoids per-call allocation (M2). */
     private val digestLocal = ThreadLocal.withInitial { MessageDigest.getInstance("SHA-256") }
@@ -476,8 +477,12 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
     @Volatile
     private var decoyAvailableGen = 0L
 
+    @Synchronized
     private fun refreshDerivedFlags() {
-        decoyCallerAppIds = buildSet {
+        // Build locally and publish from the local — refreshDerivedFlags now runs from both the
+        // config publish path and the package-event path (H-B), so building directly into
+        // decoyCallerAppIds would race (review round-3 L2).
+        val newAppIds = buildSet {
             for ((name, cfg) in config.scope) {
                 if (!cfg.decoyHiddenUidOwners) continue
                 // Resolve across every user (not just 0) so a detector installed only in a work
@@ -486,7 +491,8 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
                 add(uid % 100000)
             }
         }
-        anyDecoyCaller = decoyCallerAppIds.isNotEmpty()
+        decoyCallerAppIds = newAppIds
+        anyDecoyCaller = newAppIds.isNotEmpty()
         // Do NOT clear decoyAssignments here (review M-E): the mappings are per-uid, not
         // per-caller, so an unrelated caller opt-in/out shouldn't flip stable values; a transient
         // getPackageUid failure that shrinks the set shouldn't either. Only package events reset
@@ -511,10 +517,11 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         return null
     }
 
-    private fun logDecoyExhaustion(uid: Int) {
+    private fun logDecoyExhaustion() {
         if (decoyExhaustionLogged) return
         decoyExhaustionLogged = true
-        logW(TAG) { "decoy pool exhausted; uid $uid will leak as 'live, no package'" }
+        // Drop the uid value (round-3 L4): the message is one-shot and the uid is a correlator.
+        logW(TAG) { "decoy pool exhausted; some hidden uids will leak as 'live, no package'" }
     }
 
     /** Whether [caller] is configured to receive decoy names for UIDs it cannot otherwise see. */
@@ -560,40 +567,78 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
     /**
      * Compute (or recompute) the set of decoy candidates not currently installed. Does its IPC
      * OUTSIDE the assignment lock — never issue a PM binder call while holding our monitor
-     * (review C1). An IPC failure for a candidate makes it UNAVAILABLE, not available (review
-     * M-C: a transient failure must not get a decoy assigned to a package that could really exist).
+     * (review C1). A candidate counts as installed if it exists in ANY user (review round-3 M2:
+     * decoys are per-user via H-B, and a work-profile install would otherwise be missed and
+     * cause a two-uids-to-one-package contradiction).
+     *
+     * The published cache is stamped with the generation it was computed under so a cache that
+     * raced an invalidation is detected and discarded (round-3 M1). On any IPC failure for any
+     * candidate the cache is NOT published and that candidate is excluded from the result
+     * (fail-closed per M-C; round-3 L1 against caching failure).
      */
-    private fun computeDecoyAvailable(): Set<String> {
-        decoyAvailable?.let { return it }
+    private fun computeDecoyAvailable(): Pair<Long, Set<String>> {
+        val gen = decoyAvailableGen
+        decoyAvailable?.takeIf { it.first == gen }?.let { return it }
+
+        val users = runCatching {
+            binderLocalScope { UserManagerUtils.userIds }
+        }.getOrNull() ?: intArrayOf(0)
+
         val notInstalled = HashSet<String>(decoyPackages.size)
-        for (candidate in decoyPackages) {
-            val result = runCatching {
-                binderLocalScope { pms.getPackageUidCompat(candidate, 0L, 0) }
+        var sawFailure = false
+        candidates@ for (candidate in decoyPackages) {
+            var failedForThisCandidate = false
+            for (user in users) {
+                val result = runCatching {
+                    binderLocalScope { pms.getPackageUidCompat(candidate, 0L, user) }
+                }
+                if (result.isFailure) {
+                    failedForThisCandidate = true
+                    continue
+                }
+                val resolved = result.getOrNull() ?: -1
+                if (resolved >= 0) {
+                    // Installed somewhere — never a decoy, independent of failures in other users.
+                    continue@candidates
+                }
             }
-            // M-C: on failure, skip the candidate entirely (fail closed).
-            val uid = result.getOrNull() ?: continue
-            if (uid < 0) notInstalled.add(candidate)
+            if (failedForThisCandidate) {
+                sawFailure = true
+                continue
+            }
+            notInstalled.add(candidate)
         }
-        decoyAvailable = notInstalled
-        return notInstalled
+
+        val snap = gen to notInstalled
+        // Publish ONLY under the lock and ONLY if the generation did not change during the
+        // compute (round-3 M1), and only if every candidate resolved cleanly (round-3 L1 /
+        // M-C: a transient failure must not permanently shrink the pool via cache).
+        if (!sawFailure) {
+            synchronized(decoyAssignments) {
+                if (decoyAvailableGen == gen) decoyAvailable = snap
+            }
+        }
+        return snap
     }
 
     /**
      * A stable decoy package name for [uid]: salted so it is neither guessable nor correlatable
      * across devices, and the same every call so the value does not flicker. Candidates that are
-     * installed or already handed to another uid are skipped — a package resolving to two uids is
-     * itself a contradiction a detector could catch. Null if no free candidate remains, or if
-     * the available set was invalidated between read and commit.
+     * installed anywhere, or already handed to another uid, are skipped — a package resolving to
+     * two uids is itself a contradiction a detector could catch. Null if no free candidate
+     * remains, or if the available set was invalidated between read and commit.
      */
     fun decoyPackageForUid(uid: Int): String? {
         decoyAssignments[uid]?.let { return it }
         if (decoyPackages.isEmpty()) return null
 
-        // Precompute outside the lock (review C1) and snapshot the generation (review M-B).
-        val available = computeDecoyAvailable()
-        val genBefore = decoyAvailableGen
+        // computeDecoyAvailable returns the gen it was computed under — we use that same gen for
+        // the TOCTOU check inside the lock. Snapshotting a separate `decoyAvailableGen` after the
+        // compute would race (the invalidation could run DURING the compute and bump gen before
+        // we read it, defeating the check — round-3 M1).
+        val (genBefore, available) = computeDecoyAvailable()
         if (available.isEmpty()) {
-            logDecoyExhaustion(uid)
+            logDecoyExhaustion()
             return null
         }
 
@@ -625,7 +670,7 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
                 decoyAssignments[uid] = candidate
                 return candidate
             }
-            logDecoyExhaustion(uid)
+            logDecoyExhaustion()
             return null
         }
     }
@@ -828,8 +873,7 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
                     // H-B: a decoy-caller app being (re)installed may have gained a new appId. The
                     // appId cache is computed at config publish; without this, the feature silently
                     // disables for the reinstalled/newly-installed detector until the next config
-                    // save. config.scope membership is the right trigger — autoProtect may also
-                    // seed an entry below, so re-check after that too.
+                    // save. config.scope membership is the right trigger.
                     if (config.scope[packageName]?.decoyHiddenUidOwners == true) {
                         refreshDerivedFlags()
                     }
@@ -890,7 +934,9 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
                     }
 
                     // Decoy pool bookkeeping: a removed decoy candidate becomes available again.
-                    if (isDecoyCandidate(packageName)) decoyAvailable = null
+                    // Route through the locked invalidation so there is one invalidation path
+                    // and the generation counter is bumped for the TOCTOU check (round-3 M1).
+                    if (isDecoyCandidate(packageName)) invalidateDecoyAssignment(packageName)
 
                     // H-B: a decoy-caller app being uninstalled frees its appId; refresh so a
                     // later reinstall (same name, new appId) resolves cleanly on the next publish.

@@ -416,16 +416,21 @@ abstract class PmsHookTargetBase : IFrameworkHook {
         if (realOwners.isEmpty()) return null
         // Multi-member shared uid: real getNameForUid returns "name:uid", not a bare package (H2).
         if (realOwners.size > 1) return null
-        // Single-member sharedUserId still uses "name:uid" format for getNameForUid; detect by
-        // reading the owner's PackageInfo.sharedUserId and skip (review M-F). binderLocalScope
-        // keeps identity SYSTEM so the real (unhidden) info is returned.
-        val ownerInfo = runCatching {
-            binderLocalScope { pms.getPackageInfoCompat(realOwners[0], 0L, queriedUserId) }
-        }.getOrNull()
-        if (ownerInfo?.sharedUserId != null) return null
 
+        // Cheap check first (round-3 M3): if the owner isn't hidden from this caller, there is
+        // nothing to decoy and the sharedUserId IPC below would run on every filtered uid.
         val hiddenFromCaller = realOwners.any { service.shouldHide(caller, it, queriedUserId) }
         if (!hiddenFromCaller) return null
+
+        // Single-member sharedUserId still uses "name:uid" format for getNameForUid; detect by
+        // reading the owner's PackageInfo.sharedUserId and skip (review M-F / round-3 M3).
+        // Fails CLOSED: if we can't read PackageInfo we can't verify this uid isn't a sharedUser,
+        // so skip rather than hand out a potentially malformed decoy. binderLocalScope keeps
+        // identity SYSTEM so the real (unhidden) info is returned.
+        val ownerInfo = runCatching {
+            binderLocalScope { pms.getPackageInfoCompat(realOwners[0], 0L, queriedUserId) }
+        }.getOrNull() ?: return null
+        if (ownerInfo.sharedUserId != null) return null
 
         return service.decoyPackageForUid(queriedUid)
     }
