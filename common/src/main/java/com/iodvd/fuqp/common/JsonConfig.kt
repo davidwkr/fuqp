@@ -282,6 +282,13 @@ data class JsonConfig(
         var spoofAndroidId: Boolean = false,
 
         /**
+         * Rotation counter for the spoofed ANDROID_ID. The fake id stays stable for a given
+         * value; bumping it hands the app a fresh (again stable) id. 0 yields the same id as
+         * builds that predate rotation, so existing configs keep their current value.
+         */
+        var androidIdGeneration: Int = 0,
+
+        /**
          * When THIS app (a querier/detector) does a UID→package reverse lookup
          * (`getPackagesForUid`/`getNameForUid`) for a UID whose only owner is hidden from it,
          * return a stable, plausible decoy package name instead of nothing. Closes the

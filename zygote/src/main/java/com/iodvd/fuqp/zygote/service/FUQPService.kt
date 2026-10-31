@@ -382,10 +382,15 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
 
         // Fake ANDROID_ID: a per-(device,caller) stable value, so the app sees a consistent id
         // that is neither the real device SSAID nor shared with other apps.
-        if (name == ANDROID_ID_SETTING && database == Constants.SETTINGS_SECURE &&
-            config.scope[caller]?.spoofAndroidId == true
-        ) {
-            return ReplacementItem(name, spoofedAndroidId(caller), Constants.SETTINGS_SECURE)
+        if (name == ANDROID_ID_SETTING && database == Constants.SETTINGS_SECURE) {
+            val appConfig = config.scope[caller]
+            if (appConfig?.spoofAndroidId == true) {
+                return ReplacementItem(
+                    name,
+                    spoofedAndroidId(caller, appConfig.androidIdGeneration),
+                    Constants.SETTINGS_SECURE,
+                )
+            }
         }
 
         val templates = getEnabledSettingsTemplates(caller)
@@ -432,11 +437,14 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
     /**
      * Fake but stable ANDROID_ID for [caller]: first 8 bytes of SHA-256(salt || caller), hex-encoded
      * to the 16-char lowercase form a real SSAID uses. Distinct per caller, stable per device.
+     * A non-zero [generation] is appended (as `":" + generation`) to rotate the id; generation 0
+     * hashes exactly as before rotation existed, so pre-rotation ids are preserved.
      */
-    private fun spoofedAndroidId(caller: String): String {
+    private fun spoofedAndroidId(caller: String, generation: Int): String {
         val digest = MessageDigest.getInstance("SHA-256").run {
             update(androidIdSalt)
             update(caller.toByteArray())
+            if (generation != 0) update(":$generation".toByteArray())
             digest()
         }
         return buildString(16) {

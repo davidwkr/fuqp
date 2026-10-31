@@ -357,6 +357,22 @@ class AppSettingsV2Fragment : Fragment(R.layout.fragment_settings) {
                 showForceStopWarning()
                 true
             }
+            findPreference<Preference>("rotateAndroidId")?.let { pref ->
+                pref.summary = getString(R.string.app_rotate_android_id_desc, pack.config.androidIdGeneration)
+                pref.setOnPreferenceClickListener {
+                    MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(R.string.app_rotate_android_id)
+                        .setMessage(R.string.app_rotate_android_id_confirm)
+                        .setNegativeButton(android.R.string.cancel, null)
+                        .setPositiveButton(android.R.string.ok) { _, _ ->
+                            pack.config.androidIdGeneration++
+                            pref.summary = getString(R.string.app_rotate_android_id_desc, pack.config.androidIdGeneration)
+                            showForceStopWarning()
+                        }
+                        .show()
+                    true
+                }
+            }
         }
     }
 

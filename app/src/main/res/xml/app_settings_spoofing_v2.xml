@@ -28,6 +28,11 @@
             android:summary="@string/app_spoof_android_id_desc"
             app:singleLineTitle="false"
             android:title="@string/app_spoof_android_id" />
+        <Preference
+            android:key="rotateAndroidId"
+            android:dependency="spoofAndroidId"
+            app:singleLineTitle="false"
+            android:title="@string/app_rotate_android_id" />
         <SwitchPreferenceCompat
             android:icon="@drawable/outline_shop_24"
             android:key="decoyHiddenUidOwners"
