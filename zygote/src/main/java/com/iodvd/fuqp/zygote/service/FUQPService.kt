@@ -133,54 +133,6 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
     var anyDecoyCaller = false
         private set
 
-    init {
-        managerWorkMode = if (pms.isConflictingModuleInstalled()) {
-            logE(TAG) { "Conflicting module detected, skipping hook" }
-            Constants.MANAGER_WORK_MODE_NO_HOOKS
-        } else {
-            Constants.MANAGER_WORK_MODE_LOADING
-        }
-
-        searchDataDir()
-        saveModuleStatus()
-        UserService.service = this
-        loadFilterCount()
-        reloadConfigFromFile()
-
-        appUid = findAndVerifyAppSignature(pms)
-
-        if (managerWorkMode != Constants.MANAGER_WORK_MODE_NO_HOOKS) {
-            installHooks()
-
-            if (hooker.hooksWasCrashed) {
-                managerWorkMode = Constants.MANAGER_WORK_MODE_CRASHED
-            } else {
-                AppPresets.instance.loggerFunction = { level, msg ->
-                    logWithLevel(level, "AppPresets", msg = msg)
-                }
-                loadPresetCache()
-
-                configFileListener = object : FileObserver(configFile, CLOSE_WRITE or ATTRIB) {
-                    override fun onEvent(event: Int, path: String?) {
-                        if (writtenByManager) {
-                            writtenByManager = false
-                            return
-                        }
-
-                        reloadConfigFromFile()
-                    }
-                }
-                configFileListener.startWatching()
-
-                managerWorkMode = Constants.MANAGER_WORK_MODE_OK
-            }
-
-            saveModuleStatus()
-        }
-
-        logI(TAG) { "FUQP service initialized in mode $managerWorkMode" }
-    }
-
     private fun searchDataDir() {
         File("/data/system").list()?.forEach {
             if (it.startsWith("hide_my_applist")) {
@@ -562,6 +514,58 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         "com.viber.voip", "com.tripadvisor.tripadvisor", "deezer.android.app",
         "com.soundcloud.android",
     )
+
+    // Must stay below every property declaration. Kotlin runs property initializers and init
+    // blocks in source order, so any field declared after this block is still null while init
+    // runs (reloadConfigFromFile -> refreshDerivedFlags locks refreshLock) and is reset after
+    // it (decoyCallerAppIds). installHooks() also lets binder threads reach these fields early.
+    init {
+        managerWorkMode = if (pms.isConflictingModuleInstalled()) {
+            logE(TAG) { "Conflicting module detected, skipping hook" }
+            Constants.MANAGER_WORK_MODE_NO_HOOKS
+        } else {
+            Constants.MANAGER_WORK_MODE_LOADING
+        }
+
+        searchDataDir()
+        saveModuleStatus()
+        UserService.service = this
+        loadFilterCount()
+        reloadConfigFromFile()
+
+        appUid = findAndVerifyAppSignature(pms)
+
+        if (managerWorkMode != Constants.MANAGER_WORK_MODE_NO_HOOKS) {
+            installHooks()
+
+            if (hooker.hooksWasCrashed) {
+                managerWorkMode = Constants.MANAGER_WORK_MODE_CRASHED
+            } else {
+                AppPresets.instance.loggerFunction = { level, msg ->
+                    logWithLevel(level, "AppPresets", msg = msg)
+                }
+                loadPresetCache()
+
+                configFileListener = object : FileObserver(configFile, CLOSE_WRITE or ATTRIB) {
+                    override fun onEvent(event: Int, path: String?) {
+                        if (writtenByManager) {
+                            writtenByManager = false
+                            return
+                        }
+
+                        reloadConfigFromFile()
+                    }
+                }
+                configFileListener.startWatching()
+
+                managerWorkMode = Constants.MANAGER_WORK_MODE_OK
+            }
+
+            saveModuleStatus()
+        }
+
+        logI(TAG) { "FUQP service initialized in mode $managerWorkMode" }
+    }
 
     /** True if [name] is a decoy candidate — fast membership test used by the invalidation hook. */
     fun isDecoyCandidate(name: String?) = name != null && name in decoyPackages
