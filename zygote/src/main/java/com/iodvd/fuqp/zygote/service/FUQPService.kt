@@ -322,8 +322,10 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
 
     fun isHookEnabled(packageName: String?) = config.scope.containsKey(packageName)
 
+    // spoofAndroidId counts too: the settings hooks bail on this gate, so without it an app with
+    // only the Android ID switch on would still be handed its real SSAID.
     fun isAnySettingsReplacementsEnabled(packageName: String?) = config.scope[packageName]?.let {
-        it.applySettingsPresets.isNotEmpty() || it.applySettingTemplates.isNotEmpty()
+        it.spoofAndroidId || it.applySettingsPresets.isNotEmpty() || it.applySettingTemplates.isNotEmpty()
     } ?: false
 
     fun isAppDataIsolationExcluded(packageName: String?) =
