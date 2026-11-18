@@ -8,6 +8,10 @@
   defaults on app updates. Cover enabled/disabled behavior, fresh installs,
   updates, and per-app overrides with tests.
 
+- [ ] **Hide an active VPN from chosen apps (mode B).** Design in
+  [docs/VPN_HIDING.md](docs/VPN_HIDING.md). Implemented (`VpnHook`) against the API 37
+  ConnectivityService; still needs the on-device test plan in that doc, with a VPN up.
+
 ## Intent-query filtering: unverified fix
 
 Review scope: the uncommitted `PmsHookTargetBase.kt` change on

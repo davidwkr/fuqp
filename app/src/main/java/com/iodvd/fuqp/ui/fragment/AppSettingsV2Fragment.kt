@@ -165,6 +165,7 @@ class AppSettingsV2Fragment : Fragment(R.layout.fragment_settings) {
                 "excludeVoldIsolation" -> pack.config.excludeVoldIsolation
                 "spoofAndroidId" -> pack.config.spoofAndroidId
                 "decoyHiddenUidOwners" -> pack.config.decoyHiddenUidOwners
+                "hideVpn" -> pack.config.hideVpn
                 else -> throw IllegalArgumentException("Invalid key: $key")
             }
         }
@@ -180,6 +181,7 @@ class AppSettingsV2Fragment : Fragment(R.layout.fragment_settings) {
                 "excludeVoldIsolation" -> pack.config.excludeVoldIsolation = value
                 "spoofAndroidId" -> pack.config.spoofAndroidId = value
                 "decoyHiddenUidOwners" -> pack.config.decoyHiddenUidOwners = value
+                "hideVpn" -> pack.config.hideVpn = value
                 else -> throw IllegalArgumentException("Invalid key: $key")
             }
         }
@@ -354,6 +356,10 @@ class AppSettingsV2Fragment : Fragment(R.layout.fragment_settings) {
                 true
             }
             findPreference<SwitchPreferenceCompat>("excludeTargetInstallationSource")?.setOnPreferenceChangeListener { _, _ ->
+                showForceStopWarning()
+                true
+            }
+            findPreference<SwitchPreferenceCompat>("hideVpn")?.setOnPreferenceChangeListener { _, _ ->
                 showForceStopWarning()
                 true
             }

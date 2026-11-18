@@ -39,5 +39,11 @@
             android:summary="@string/app_decoy_hidden_uids_desc"
             app:singleLineTitle="false"
             android:title="@string/app_decoy_hidden_uids" />
+        <SwitchPreferenceCompat
+            android:icon="@drawable/outline_android_24"
+            android:key="hideVpn"
+            android:summary="@string/app_hide_vpn_desc"
+            app:singleLineTitle="false"
+            android:title="@string/app_hide_vpn" />
     </PreferenceCategory>
 </PreferenceScreen>

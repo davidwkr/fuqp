@@ -306,6 +306,14 @@ data class JsonConfig(
         var decoyHiddenUidOwners: Boolean = false,
 
         /**
+         * Hide an active VPN from THIS app while its traffic keeps using the VPN: the
+         * connectivity APIs report the VPN's underlying network instead (see
+         * docs/VPN_HIDING.md). Cannot hide what the app reads in-process (tun0 via
+         * NetworkInterface, /proc/net) or what a server sees (the exit IP).
+         */
+        var hideVpn: Boolean = false,
+
+        /**
          * A list of applied application templates, it has to contain items
          * from the global application template list
          */

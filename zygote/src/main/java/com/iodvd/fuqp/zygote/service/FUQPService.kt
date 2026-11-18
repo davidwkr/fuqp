@@ -51,6 +51,7 @@ import com.iodvd.fuqp.zygote.hook.PmsHookTarget33
 import com.iodvd.fuqp.zygote.hook.PmsHookTarget34
 import com.iodvd.fuqp.zygote.hook.PmsPackageEventsHook
 import com.iodvd.fuqp.zygote.hook.UsageStatsHook
+import com.iodvd.fuqp.zygote.hook.VpnHook
 import com.iodvd.fuqp.zygote.hook.ZygoteHook
 import com.iodvd.fuqp.zygote.util.ActivityManagerUtils
 import com.iodvd.fuqp.zygote.util.BrowserUtils.getDefaultBrowser
@@ -291,6 +292,10 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         frameworkHooks.add(ImmHook())
         frameworkHooks.add(ZygoteHook())
         frameworkHooks.add(UsageStatsHook())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // Self-disables unless every ConnectivityService member it needs resolves.
+            frameworkHooks.add(VpnHook())
+        }
 
         frameworkHooks.forEach(IFrameworkHook::load)
         logI(TAG) { "Hooks installed" }
@@ -415,6 +420,13 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
     private var decoyCallerAppIds: Set<Int> = emptySet()
 
     /**
+     * App-ids of apps with [JsonConfig.AppConfig.hideVpn] on, so the connectivity hooks bail in
+     * O(1) for everyone else. Recomputed alongside [decoyCallerAppIds].
+     */
+    @Volatile
+    private var vpnHidingAppIds: Set<Int> = emptySet()
+
+    /**
      * Decoy candidates known not to be installed, cached outside the assignment lock to keep IPC
      * out of the critical section (review C1). Stamped with the generation it was computed under
      * so a cache published across an invalidation can be detected and discarded (review round-3
@@ -451,17 +463,19 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
         // Build locally and publish from the local — refreshDerivedFlags now runs from both the
         // config publish path and the package-event path (H-B), so building directly into
         // decoyCallerAppIds would race (review round-3 L2).
-        val newAppIds = buildSet {
-            for ((name, cfg) in config.scope) {
-                if (!cfg.decoyHiddenUidOwners) continue
-                // Resolve across every user (not just 0) so a detector installed only in a work
-                // profile isn't silently dropped from the opt-in set (review H-B).
-                val uid = resolveAnyUidOf(name) ?: continue
-                add(uid % 100000)
-            }
+        val newAppIds = mutableSetOf<Int>()
+        val newVpnAppIds = mutableSetOf<Int>()
+        for ((name, cfg) in config.scope) {
+            if (!cfg.decoyHiddenUidOwners && !cfg.hideVpn) continue
+            // Resolve across every user (not just 0) so a detector installed only in a work
+            // profile isn't silently dropped from the opt-in set (review H-B).
+            val uid = resolveAnyUidOf(name) ?: continue
+            if (cfg.decoyHiddenUidOwners) newAppIds.add(uid % 100000)
+            if (cfg.hideVpn) newVpnAppIds.add(uid % 100000)
         }
         decoyCallerAppIds = newAppIds
         anyDecoyCaller = newAppIds.isNotEmpty()
+        vpnHidingAppIds = newVpnAppIds
         // Do NOT clear decoyAssignments here (review M-E): the mappings are per-uid, not
         // per-caller, so an unrelated caller opt-in/out shouldn't flip stable values; a transient
         // getPackageUid failure that shrinks the set shouldn't either. Only package events reset
@@ -499,6 +513,9 @@ class FUQPService(val pms: IPackageManager, val pmn: Any?) : IFUQPService.Stub()
 
     /** Opt-in check by app-id — used by the hooks to bail without any IPC. */
     fun isDecoyCallerAppId(appId: Int) = appId in decoyCallerAppIds
+
+    /** Whether [uid] has the active VPN hidden from it. O(1), no IPC; see [VpnHook]. */
+    fun isVpnHiddenFor(uid: Int) = uid % 100000 in vpnHidingAppIds
 
     /**
      * Plausible, Play-distributed packages used as decoys. Deliberately ordinary consumer apps:

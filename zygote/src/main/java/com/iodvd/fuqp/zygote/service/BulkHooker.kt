@@ -54,11 +54,12 @@ class BulkHooker {
         methodName: String,
         argumentCount: Int,
         paramTypes: List<Class<*>>? = null,
+        loader: ClassLoader? = SystemServerHook.classLoader,
         impl: HookTransformer,
     ): Boolean {
         val element = preAddHook(clazz, methodName, argumentCount, paramTypes, impl)
 
-        if (element != null && applyHook(clazz, element)) {
+        if (element != null && applyHook(clazz, element, loader)) {
             putHook(clazz, element)
             return true
         }
@@ -140,8 +141,9 @@ class BulkHooker {
         methodName: String,
         argumentCount: Int = PARAMETER_COUNT_UNKNOWN,
         paramTypes: List<Class<*>>? = null,
+        loader: ClassLoader? = SystemServerHook.classLoader,
         crossinline hook: (methodName: String, frame: EmulatedStackFrame, returnValue: ReturnValue) -> Unit,
-    ) = addHook(clazz, methodName, argumentCount, paramTypes) { original, frame ->
+    ) = addHook(clazz, methodName, argumentCount, paramTypes, loader) { original, frame ->
         hookBeforeCommon(clazz, methodName, original, frame, hook)
     }
 
@@ -202,8 +204,9 @@ class BulkHooker {
         argumentCount: Int = PARAMETER_COUNT_UNKNOWN,
         paramTypes: List<Class<*>>? = null,
         handleAfterThrows: Boolean = false,
+        loader: ClassLoader? = SystemServerHook.classLoader,
         crossinline hook: (methodName: String, frame: EmulatedStackFrame, returnValue: ReturnValue) -> Unit,
-    ) = addHook(clazz, methodName, argumentCount, paramTypes) { original, frame ->
+    ) = addHook(clazz, methodName, argumentCount, paramTypes, loader) { original, frame ->
         hookAfterCommon(clazz, methodName, handleAfterThrows, original, frame, hook)
     }
 
