@@ -145,8 +145,14 @@ data class JsonConfig(
             "accessibility", "dev_options", "input_method",
         ),
 
+        /** App-hide templates applied to a sensitive app (names from [JsonConfig.templates]). */
+        val appTemplates: MutableSet<String> = mutableSetOf(),
+
         /** Mask installation source on matched sensitive apps. */
         var hideInstallationSource: Boolean = true,
+
+        /** Also mask system apps' installation source; needs [hideInstallationSource]. */
+        var hideSystemInstallationSource: Boolean = false,
 
         /** Return a fake, per-app-stable ANDROID_ID (SSAID) to matched sensitive apps. */
         var spoofAndroidId: Boolean = true,

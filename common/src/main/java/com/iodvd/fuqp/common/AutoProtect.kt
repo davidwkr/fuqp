@@ -47,6 +47,7 @@ object AutoProtect {
         val validSettingsPresets = SettingsPresets.instance.presetNames.toSet()
         val appPresets = rules.appPresets.filter { it in validAppPresets }
         val settingsPresets = rules.settingsPresets.filter { it in validSettingsPresets }
+        val appTemplates = rules.appTemplates.filter { it in config.templates }
 
         val scopeBefore = config.scope.keys.toSet()
         val newlyProtected = mutableListOf<String>()
@@ -72,7 +73,7 @@ object AutoProtect {
                 }
 
                 isSensitive(pkg, rules, isSystem) -> {
-                    if (appPresets.isEmpty() && settingsPresets.isEmpty() &&
+                    if (appPresets.isEmpty() && settingsPresets.isEmpty() && appTemplates.isEmpty() &&
                         !rules.hideInstallationSource && !rules.spoofAndroidId
                     ) continue
                     val isNew = pkg !in scopeBefore
@@ -88,10 +89,16 @@ object AutoProtect {
                         appConfig.applySettingsPresets.addAll(addedSet)
                         mutated = true
                     }
+                    val addedTemplates = appTemplates.filterNot { it in appConfig.applyTemplates }
+                    if (addedTemplates.isNotEmpty()) {
+                        appConfig.applyTemplates.addAll(addedTemplates)
+                        mutated = true
+                    }
                     // Only on new entries, so an existing app's explicit install-source choice is kept.
                     if (rules.hideInstallationSource && isNew) {
                         appConfig.hideInstallationSource = true
                         appConfig.excludeTargetInstallationSource = true
+                        if (rules.hideSystemInstallationSource) appConfig.hideSystemInstallationSource = true
                     }
                     // Same policy for SSAID spoofing: set it on first detection only.
                     if (rules.spoofAndroidId && isNew && !appConfig.spoofAndroidId) {
