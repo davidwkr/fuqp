@@ -74,7 +74,7 @@ object AutoProtect {
 
                 isSensitive(pkg, rules, isSystem) -> {
                     if (appPresets.isEmpty() && settingsPresets.isEmpty() && appTemplates.isEmpty() &&
-                        !rules.hideInstallationSource && !rules.spoofAndroidId
+                        !rules.hideInstallationSource && !rules.spoofAndroidId && !rules.hideVpn
                     ) continue
                     val isNew = pkg !in scopeBefore
                     val appConfig = config.scope.getOrPut(pkg) { mutated = true; JsonConfig.AppConfig() }
@@ -103,6 +103,11 @@ object AutoProtect {
                     // Same policy for SSAID spoofing: set it on first detection only.
                     if (rules.spoofAndroidId && isNew && !appConfig.spoofAndroidId) {
                         appConfig.spoofAndroidId = true
+                        mutated = true
+                    }
+                    // And for VPN hiding.
+                    if (rules.hideVpn && isNew && !appConfig.hideVpn) {
+                        appConfig.hideVpn = true
                         mutated = true
                     }
                     if (isNew) newlyProtected += pkg

@@ -157,6 +157,9 @@ data class JsonConfig(
         /** Return a fake, per-app-stable ANDROID_ID (SSAID) to matched sensitive apps. */
         var spoofAndroidId: Boolean = true,
 
+        /** Hide an active VPN from matched sensitive apps ([AppConfig.hideVpn]). */
+        var hideVpn: Boolean = false,
+
         /**
          * Exact package names always treated as sensitive. User-extensible. Seeded with the real
          * apps verified against the device this was built for — several of these are NOT caught by
