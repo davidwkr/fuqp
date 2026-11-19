@@ -309,19 +309,8 @@ object ConfigManager {
                     }
                 }
 
-                // --- STEP 3: Clear uninstalled apps from templates ---
-                inConfig.templates.forEach { (key, value) ->
-                    val newList = value.appList.filter { PackageHelper.exists(it) }
-                    val count = value.appList.size - newList.size
-
-                    if (count > 0) {
-                        cleanedAppCount += count
-                        inConfig.templates[key] = JsonConfig.Template(
-                            isWhitelist = value.isWhitelist,
-                            appList = newList.toSet(),
-                        )
-                    }
-                }
+                // Templates are left as they are: they list apps ahead of install on purpose,
+                // so an app that is not installed yet is not a remnant there.
 
                 if ((scopeRemoveCount > 0 || cleanedAppCount > 0) && inConfig == config) {
                     log(Log.INFO, TAG, "Pruned $scopeRemoveCount app configs and $cleanedAppCount app entries")
